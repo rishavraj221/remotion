@@ -1,0 +1,6 @@
+# Ignore all AI-generated project files
+generated-*.tsx
+
+# Note: current-project.tsx is tracked in git with default null export
+# to prevent build errors. The backend overwrites it at runtime.
+

@@ -36,7 +36,11 @@
 		"memfs": "3.4.3",
 		"source-map": "0.7.3",
 		"open": "^8.4.2",
-		"zod": "catalog:"
+		"zod": "catalog:",
+		"react-markdown": "^9.0.1",
+		"remark-gfm": "^4.0.0",
+		"rehype-highlight": "^7.0.0",
+		"highlight.js": "^11.9.0"
 	},
 	"devDependencies": {
 		"react": "catalog:",

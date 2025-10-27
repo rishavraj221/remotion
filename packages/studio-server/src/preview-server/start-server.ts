@@ -15,6 +15,7 @@ import {wdm} from './dev-middleware';
 import {webpackHotMiddleware} from './hot-middleware';
 import type {LiveEventsServer} from './live-events';
 import {makeLiveEventsRouter} from './live-events';
+import {makeAIWebSocketServer} from '../websocket-ai'
 
 export const startServer = async (options: {
 	entry: string;
@@ -131,6 +132,8 @@ export const startServer = async (options: {
 				}
 			});
 	});
+
+	void makeAIWebSocketServer(server);
 
 	const desiredPort =
 		options?.port ??

@@ -17,6 +17,10 @@ const external = [
 	'zod',
 	'remotion/no-react',
 	'react/jsx-runtime',
+	'react-markdown',
+	'remark-gfm',
+	'rehype-highlight',
+	'highlight.js',
 ];
 
 await buildPackage({

@@ -11,7 +11,8 @@ import {
 import {useIsRulerVisible} from './EditorRuler/use-is-ruler-visible';
 import {ExplorerPanel} from './ExplorerPanel';
 import MobilePanel from './MobilePanel';
-import {OptionsPanel} from './OptionsPanel';
+// import {OptionsPanel} from './OptionsPanel';
+import {MockChatbot} from './MockChatbot';
 import {PreviewToolbar} from './PreviewToolbar';
 import {SplitterContainer} from './Splitter/SplitterContainer';
 import {SplitterElement} from './Splitter/SplitterElement';
@@ -144,11 +145,13 @@ export const TopPanel: React.FC<{
 							{actualStateRight === 'expanded' ? (
 								isMobileLayout ? (
 									<MobilePanel onClose={onCollapseRight}>
-										<OptionsPanel readOnlyStudio={readOnlyStudio} />
+										{/* <OptionsPanel readOnlyStudio={readOnlyStudio} /> */}
+										<MockChatbot />
 									</MobilePanel>
 								) : (
 									<SplitterElement sticky={null} type="anti-flexer">
-										<OptionsPanel readOnlyStudio={readOnlyStudio} />
+										{/* <OptionsPanel readOnlyStudio={readOnlyStudio} /> */}
+										<MockChatbot />
 									</SplitterElement>
 								)
 							) : null}

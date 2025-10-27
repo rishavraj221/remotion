@@ -1,0 +1,457 @@
+import React, { useCallback, useRef, useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import { BACKGROUND, INPUT_BACKGROUND, BLUE, TEXT_COLOR } from '../helpers/colors';
+import 'highlight.js/styles/github-dark.css';
+
+const container: React.CSSProperties = {
+	height: '100%',
+	width: '100%',
+	display: 'flex',
+	flexDirection: 'column',
+	backgroundColor: BACKGROUND,
+	padding: '16px',
+	fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+};
+
+const messagesContainer: React.CSSProperties = {
+	flex: 1,
+	overflowY: 'auto',
+	marginBottom: '16px',
+	display: 'flex',
+	flexDirection: 'column',
+	gap: '10px',
+	paddingRight: '4px',
+};
+
+const messageStyle: React.CSSProperties = {
+	padding: '10px 14px',
+	borderRadius: '6px',
+	maxWidth: '85%',
+	wordWrap: 'break-word',
+	fontSize: '13px',
+	lineHeight: '1.5',
+	letterSpacing: '0.01em',
+};
+
+const userMessageStyle: React.CSSProperties = {
+	...messageStyle,
+	backgroundColor: BLUE,
+	color: '#ffffff',
+	alignSelf: 'flex-end',
+	marginLeft: 'auto',
+	boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
+};
+
+const botMessageStyle: React.CSSProperties = {
+	...messageStyle,
+	backgroundColor: INPUT_BACKGROUND,
+	color: '#e8e8e8',
+	alignSelf: 'flex-start',
+	border: '1px solid rgba(255, 255, 255, 0.05)',
+};
+
+const inputContainer: React.CSSProperties = {
+	display: 'flex',
+	gap: '8px',
+	alignItems: 'center',
+};
+
+const inputStyle: React.CSSProperties = {
+	flex: 1,
+	padding: '10px 12px',
+	backgroundColor: INPUT_BACKGROUND,
+	border: '1px solid rgba(255, 255, 255, 0.08)',
+	borderRadius: '6px',
+	color: TEXT_COLOR,
+	fontSize: '13px',
+	outline: 'none',
+	fontFamily: 'inherit',
+	transition: 'border-color 0.2s ease',
+};
+
+const buttonStyle: React.CSSProperties = {
+	padding: '10px 18px',
+	backgroundColor: BLUE,
+	color: '#ffffff',
+	border: 'none',
+	borderRadius: '6px',
+	cursor: 'pointer',
+	fontSize: '13px',
+	fontWeight: '500',
+	fontFamily: 'inherit',
+	transition: 'background-color 0.2s ease',
+	boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+};
+
+const headerStyle: React.CSSProperties = {
+	fontSize: '13px',
+	fontWeight: '600',
+	color: TEXT_COLOR,
+	marginBottom: '16px',
+	paddingBottom: '12px',
+	borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+	letterSpacing: '0.02em',
+	display: 'flex',
+	alignItems: 'center',
+	gap: '8px',
+};
+
+const statusStyle: React.CSSProperties = {
+	fontSize: '10px',
+	color: '#555',
+	fontStyle: 'italic',
+	padding: '4px 8px',
+	backgroundColor: 'rgba(255, 255, 255, 0.01)',
+	borderRadius: '3px',
+	alignSelf: 'center',
+	textAlign: 'center',
+	maxWidth: '100%',
+	opacity: 0.6,
+};
+
+const loadingStyle: React.CSSProperties = {
+	...messageStyle,
+	backgroundColor: INPUT_BACKGROUND,
+	color: '#888',
+	alignSelf: 'flex-start',
+	border: '1px solid rgba(255, 255, 255, 0.05)',
+	fontStyle: 'italic',
+};
+
+const markdownStyles = `
+.markdown-content {
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.markdown-content p {
+	margin: 0 0 6px 0;
+	font-size: 13px;
+}
+
+.markdown-content p:last-child {
+	margin-bottom: 0;
+}
+
+.markdown-content code {
+	background-color: rgba(0, 0, 0, 0.4);
+	padding: 2px 5px;
+	border-radius: 3px;
+	font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
+	font-size: 11px;
+	color: #e8e8e8;
+}
+
+.markdown-content pre {
+	background-color: rgba(0, 0, 0, 0.5) !important;
+	padding: 10px !important;
+	border-radius: 5px;
+	overflow-x: auto;
+	margin: 6px 0;
+}
+
+.markdown-content pre code {
+	background-color: transparent;
+	padding: 0;
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.markdown-content strong {
+	font-weight: 600;
+	color: #fff;
+	font-size: inherit;
+}
+
+.markdown-content em {
+	font-style: italic;
+	font-size: inherit;
+}
+
+.markdown-content a {
+	color: #4ade80;
+	text-decoration: underline;
+	font-size: inherit;
+}
+
+.markdown-content a:hover {
+	color: #22c55e;
+}
+
+.markdown-content ul, .markdown-content ol {
+	margin: 6px 0;
+	padding-left: 18px;
+	font-size: 13px;
+}
+
+.markdown-content li {
+	margin: 2px 0;
+	font-size: 13px;
+}
+
+.markdown-content blockquote {
+	border-left: 2px solid #4ade80;
+	padding-left: 10px;
+	margin: 6px 0;
+	color: #aaa;
+	font-size: 13px;
+}
+
+.markdown-content table {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 6px 0;
+	font-size: 12px;
+}
+
+.markdown-content th, .markdown-content td {
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	padding: 4px 8px;
+	text-align: left;
+	font-size: 12px;
+}
+
+.markdown-content th {
+	background-color: rgba(255, 255, 255, 0.05);
+	font-weight: 600;
+}
+
+.markdown-content h1, .markdown-content h2, .markdown-content h3, 
+.markdown-content h4, .markdown-content h5, .markdown-content h6 {
+	margin: 8px 0 4px 0;
+	font-weight: 600;
+}
+
+.markdown-content h1 { font-size: 15px; }
+.markdown-content h2 { font-size: 14px; }
+.markdown-content h3 { font-size: 13px; }
+.markdown-content h4 { font-size: 13px; }
+.markdown-content h5 { font-size: 13px; }
+.markdown-content h6 { font-size: 13px; }
+`;
+
+type Message = {
+	text: string;
+	sender: 'user' | 'bot' | 'status';
+	timestamp: Date;
+};
+
+export const MockChatbot: React.FC = () => {
+	const [messages, setMessages] = useState<Message[]>([
+		{
+			text: 'Hello! I\'m your video assistant. How can I help you today?',
+			sender: 'bot',
+			timestamp: new Date(),
+		},
+	]);
+	const [input, setInput] = useState('');
+	const [connected, setConnected] = useState(false);
+	const [isLoading, setIsLoading] = useState(false);
+	const wsRef = useRef<WebSocket | null>(null);
+	const messagesEndRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const ws = new WebSocket('ws://localhost:3000/ai-ws');
+
+		ws.onopen = () => {
+			console.log('WebSocket connected');
+			setConnected(true);
+			setMessages((prev) => [
+				...prev,
+				{
+					text: 'Connected to AI Backend',
+					sender: 'status',
+					timestamp: new Date()
+				}
+			])
+		}
+
+		ws.onmessage = async (event) => {
+			console.log('🔵 [Frontend] Raw message received:', event.data);
+
+			try {
+				let messageText: string;
+
+				// Handle Blob data
+				if (event.data instanceof Blob) {
+					console.log('🔵 [Frontend] Message is a Blob, reading as text...');
+					messageText = await event.data.text();
+				} else {
+					messageText = event.data;
+				}
+
+				console.log('🔵 [Frontend] Message text:', messageText);
+
+				const data = JSON.parse(messageText);
+				console.log('🔵 [Frontend] Parsed data:', data);
+				console.log('🔵 [Frontend] Content:', data.content);
+
+				setIsLoading(false); // Stop loading indicator
+
+				// Handle code-generated messages specially
+				let messageContent = data.content || JSON.stringify(data);
+				if (data.type === 'code-generated') {
+					if (data.success) {
+						messageContent = `${data.content}\n\n**Tip:** Switch to the "ai-project" composition in the sidebar to view your generated video!`;
+					} else {
+						messageContent = data.content;
+					}
+				}
+
+				const newMessage = {
+					text: messageContent,
+					sender: 'bot' as const,
+					timestamp: new Date()
+				};
+
+				console.log('🔵 [Frontend] Adding message:', newMessage);
+
+				setMessages((prev) => {
+					console.log('🔵 [Frontend] Previous messages count:', prev.length);
+					const updated = [...prev, newMessage];
+					console.log('🔵 [Frontend] New messages count:', updated.length);
+					return updated;
+				});
+			} catch (error) {
+				console.error('❌ [Frontend] Failed to parse message:', error);
+				setIsLoading(false); // Stop loading on error too
+			}
+		}
+
+		ws.onerror = (error) => {
+			console.error('WebSocket error:', error);
+			setMessages((prev) => [
+				...prev,
+				{
+					text: 'Connection error',
+					sender: 'status',
+					timestamp: new Date()
+				}
+			])
+		}
+
+		ws.onclose = () => {
+			console.log('WebSocket disconnected');
+			setConnected(false);
+			setMessages((prev) => [
+				...prev,
+				{
+					text: 'Disconnected from AI Backend',
+					sender: 'status',
+					timestamp: new Date()
+				}
+			])
+		}
+
+		wsRef.current = ws;
+
+		return () => {
+			ws.close();
+		}
+	}, []);
+
+	// Auto-scroll to bottom when new messages arrive or loading state changes
+	useEffect(() => {
+		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+	}, [messages, isLoading]);
+
+	const handleSend = useCallback(() => {
+		if (!input.trim() || !wsRef.current) return;
+
+		const userMessage: Message = {
+			text: input,
+			sender: 'user',
+			timestamp: new Date(),
+		};
+
+		setMessages((prev) => [...prev, userMessage]);
+		setIsLoading(true); // Start loading indicator
+
+		wsRef.current.send(JSON.stringify({
+			type: 'chat',
+			message: input
+		}))
+
+		setInput('');
+	}, [input]);
+
+	const handleKeyPress = useCallback(
+		(e: React.KeyboardEvent<HTMLInputElement>) => {
+			if (e.key === 'Enter') {
+				handleSend();
+			}
+		},
+		[handleSend],
+	);
+
+	return (
+		<div style={container} className="css-reset">
+			<style>{markdownStyles}</style>
+			<div style={headerStyle}>
+				<span style={{
+					width: '8px',
+					height: '8px',
+					borderRadius: '50%',
+					backgroundColor: connected ? '#4ade80' : '#ef4444',
+				}} />
+				Kureita AI
+			</div>
+			<div style={messagesContainer}>
+				{messages.map((message, index) => (
+					<div
+						key={index}
+						style={
+							message.sender === 'user'
+								? userMessageStyle
+								: message.sender === 'status'
+									? statusStyle
+									: botMessageStyle
+						}
+					>
+						<div className="markdown-content">
+							<ReactMarkdown
+								remarkPlugins={[remarkGfm]}
+								rehypePlugins={[rehypeHighlight]}
+							>
+								{message.text}
+							</ReactMarkdown>
+						</div>
+					</div>
+				))}
+				{isLoading && (
+					<div style={loadingStyle}>
+						Just a min...
+					</div>
+				)}
+				<div ref={messagesEndRef} />
+			</div>
+			<div style={inputContainer}>
+				<input
+					type="text"
+					value={input}
+					onChange={(e) => setInput(e.target.value)}
+					onKeyPress={handleKeyPress}
+					placeholder="Type your message..."
+					style={inputStyle}
+					disabled={!connected}
+				/>
+				<button
+					onClick={handleSend}
+					style={{
+						...buttonStyle,
+						opacity: connected ? 1 : 0.5,
+						cursor: connected ? 'pointer' : 'not-allowed',
+					}}
+					disabled={!connected}
+				>
+					Send
+				</button>
+			</div>
+		</div>
+	);
+};
+

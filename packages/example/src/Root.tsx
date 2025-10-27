@@ -1,8 +1,8 @@
 // @ts-expect-error no types
 import styles from './styles.module.scss';
 
-import {alias} from 'lib/alias';
-import React, {useCallback, useMemo} from 'react';
+import { alias } from 'lib/alias';
+import React, { useCallback, useMemo } from 'react';
 import {
 	CalculateMetadataFunction,
 	Composition,
@@ -11,102 +11,103 @@ import {
 	getInputProps,
 	staticFile,
 } from 'remotion';
-import {z} from 'zod';
-import {TwentyTwoKHzAudio} from './22KhzAudio';
-import {UseanimatedEmojis} from './AnimatedEmojis';
-import BetaText, {betaTextSchema} from './BetaText';
-import {NativeBufferStateForImage} from './BufferState/Image';
-import {NativeBufferState} from './BufferState/Simple';
-import {NativeBufferStateForVideo} from './BufferState/Video';
-import {CancelRender} from './CancelRender';
-import {ClassSerialization} from './ClassSerialization';
-import {ColorInterpolation} from './ColorInterpolation';
-import {ComplexSounds} from './ComplexSounds';
-import {MyCtx, WrappedInContext} from './Context';
+import { z } from 'zod';
+import { TwentyTwoKHzAudio } from './22KhzAudio';
+import AIProject from './ai-projects';
+import { UseanimatedEmojis } from './AnimatedEmojis';
+import BetaText, { betaTextSchema } from './BetaText';
+import { NativeBufferStateForImage } from './BufferState/Image';
+import { NativeBufferState } from './BufferState/Simple';
+import { NativeBufferStateForVideo } from './BufferState/Video';
+import { CancelRender } from './CancelRender';
+import { ClassSerialization } from './ClassSerialization';
+import { ColorInterpolation } from './ColorInterpolation';
+import { ComplexSounds } from './ComplexSounds';
+import { MyCtx, WrappedInContext } from './Context';
 import CorruptVideo from './CorruptVideo';
-import {DecoderDemo} from './DecoderDemo';
-import {DynamicDuration, dynamicDurationSchema} from './DynamicDuration';
-import {EmojiTestbed} from './Emoji';
-import {ErrorOnFrame10} from './ErrorOnFrame10';
-import {Expert} from './Expert';
-import {FontDemo} from './Fonts';
-import {Framer} from './Framer';
-import {FreezeExample} from './Freeze/FreezeExample';
-import {FreezePortion} from './FreezePortion/FreezePortion';
-import {Green} from './Green';
-import {HlsDemo} from './Hls/HlsDemo';
-import {HugeImage} from './HugeImage';
-import {HugePayload, hugePayloadSchema} from './HugePayload';
-import {Layers} from './Layers';
-import {ManyAudio} from './ManyAudio';
-import {HandleAudioRenderError} from './MediaErrorHandling/HandleAudioRenderError';
-import {InfiniteAudio} from './MediaErrorHandling/InfiniteAudio';
-import {MissingImg} from './MissingImg';
-import {OffthreadRemoteVideo} from './OffthreadRemoteVideo/OffthreadRemoteVideo';
-import {OffthreadVideoToCanvas} from './OffthreadVideoToCanvas';
-import {OrbScene} from './Orb';
-import {ShapesMorph} from './Paths/ShapesMorph';
-import {SlicePath} from './Paths/SlicePath';
+import { DecoderDemo } from './DecoderDemo';
+import { DynamicDuration, dynamicDurationSchema } from './DynamicDuration';
+import { EmojiTestbed } from './Emoji';
+import { ErrorOnFrame10 } from './ErrorOnFrame10';
+import { Expert } from './Expert';
+import { FontDemo } from './Fonts';
+import { Framer } from './Framer';
+import { FreezeExample } from './Freeze/FreezeExample';
+import { FreezePortion } from './FreezePortion/FreezePortion';
+import { Green } from './Green';
+import { HlsDemo } from './Hls/HlsDemo';
+import { HugeImage } from './HugeImage';
+import { HugePayload, hugePayloadSchema } from './HugePayload';
+import { Layers } from './Layers';
+import { ManyAudio } from './ManyAudio';
+import { HandleAudioRenderError } from './MediaErrorHandling/HandleAudioRenderError';
+import { InfiniteAudio } from './MediaErrorHandling/InfiniteAudio';
+import { MissingImg } from './MissingImg';
+import { OffthreadRemoteVideo } from './OffthreadRemoteVideo/OffthreadRemoteVideo';
+import { OffthreadVideoToCanvas } from './OffthreadVideoToCanvas';
+import { OrbScene } from './Orb';
+import { ShapesMorph } from './Paths/ShapesMorph';
+import { SlicePath } from './Paths/SlicePath';
 import {
 	PostmountExample,
 	PostmountWithStyles,
 } from './Postmount/PostmountExample';
-import {PremountedExample} from './Premount';
-import {PremountedRemoteVideos} from './Premount/RemoteVideos';
+import { PremountedExample } from './Premount';
+import { PremountedRemoteVideos } from './Premount/RemoteVideos';
 import InfinityVideo from './ReallyLongVideo';
 import RemoteVideo from './RemoteVideo';
-import {RetryDelayRender} from './RetryDelayRender';
+import { RetryDelayRender } from './RetryDelayRender';
 import RiveVehicle from './Rive/RiveExample';
-import {ScalePath} from './ScalePath';
+import { ScalePath } from './ScalePath';
 import {
 	ArrayTest,
 	SchemaTest,
 	schemaArrayTestSchema,
 	schemaTestSchema,
 } from './SchemaTest';
-import {Scripts} from './Scripts';
-import {WidthHeightSequences} from './Sequence/WidthHeightSequences';
+import { Scripts } from './Scripts';
+import { WidthHeightSequences } from './Sequence/WidthHeightSequences';
 import CircleTest from './Shapes/CircleTest';
 import EllipseTest from './Shapes/EllipseTest';
 import RectTest from './Shapes/RectTest';
 import StarTest from './Shapes/StarTest';
 import TriangleTest from './Shapes/TriangleTest';
-import {SkipZeroFrame} from './SkipZeroFrame';
-import {BaseSpring, SpringWithDuration} from './Spring/base-spring';
-import {SeriesTesting} from './StaggerTesting';
-import {StaticDemo} from './StaticServer';
-import {StillHelloWorld} from './StillHelloWorld';
-import {StillZoom} from './StillZoom';
-import {DeleteStaticFile} from './StudioApis/DeleteStaticFile';
-import {ClickUpdate} from './StudioApis/RestartStudio';
+import { SkipZeroFrame } from './SkipZeroFrame';
+import { BaseSpring, SpringWithDuration } from './Spring/base-spring';
+import { SeriesTesting } from './StaggerTesting';
+import { StaticDemo } from './StaticServer';
+import { StillHelloWorld } from './StillHelloWorld';
+import { StillZoom } from './StillZoom';
+import { DeleteStaticFile } from './StudioApis/DeleteStaticFile';
+import { ClickUpdate } from './StudioApis/RestartStudio';
 import {
 	SaveDefaultProps,
 	saveStudioSchema,
 } from './StudioApis/SaveDefaultProps';
-import {TriggerCalculateMetadata} from './StudioApis/TriggerCalculateMetadata';
-import {WriteStaticFile} from './StudioApis/WriteStaticFile';
+import { TriggerCalculateMetadata } from './StudioApis/TriggerCalculateMetadata';
+import { WriteStaticFile } from './StudioApis/WriteStaticFile';
 import './style.css';
-import {SubtitleArtifact} from './SubtitleArtifact/SubtitleArtifact';
-import {SvgFilter} from './SvgFilter';
-import {Tailwind} from './Tailwind';
-import {TenFrameTester} from './TenFrameTester';
-import {TextStroke} from './TextStroke';
+import { SubtitleArtifact } from './SubtitleArtifact/SubtitleArtifact';
+import { SvgFilter } from './SvgFilter';
+import { Tailwind } from './Tailwind';
+import { TenFrameTester } from './TenFrameTester';
+import { TextStroke } from './TextStroke';
 import ThreeBasic from './ThreeBasic';
-import {ThreeHtml} from './ThreeHtml/ThreeHtml';
-import {VideoTextureDemo} from './ThreeScene/Scene';
-import {Timeout} from './Timeout';
-import {FitText, fitTextSchema} from './Title/FitText';
-import {AudioTransition} from './Transitions/AudioTransition';
-import {BasicTransition} from './Transitions/BasicTransition';
-import {CustomTransition} from './Transitions/CustomTransition';
-import {VideoOnCanvas} from './VideoOnCanvas';
-import {Greenscreen} from './VideoOnCanvas/greenscreen';
-import {VideoParser} from './VideoParser';
-import {VideoSpeed} from './VideoSpeed';
-import {VideoTesting} from './VideoTesting';
-import {WarpDemoOuter} from './WarpText';
-import {WarpDemo2} from './WarpText/demo2';
-import {WatchStaticDemo} from './watch-static';
+import { ThreeHtml } from './ThreeHtml/ThreeHtml';
+import { VideoTextureDemo } from './ThreeScene/Scene';
+import { Timeout } from './Timeout';
+import { FitText, fitTextSchema } from './Title/FitText';
+import { AudioTransition } from './Transitions/AudioTransition';
+import { BasicTransition } from './Transitions/BasicTransition';
+import { CustomTransition } from './Transitions/CustomTransition';
+import { VideoOnCanvas } from './VideoOnCanvas';
+import { Greenscreen } from './VideoOnCanvas/greenscreen';
+import { VideoParser } from './VideoParser';
+import { VideoSpeed } from './VideoSpeed';
+import { VideoTesting } from './VideoTesting';
+import { WarpDemoOuter } from './WarpText';
+import { WarpDemo2 } from './WarpText/demo2';
+import { WatchStaticDemo } from './watch-static';
 
 if (alias !== 'alias') {
 	throw new Error('should support TS aliases');
@@ -114,41 +115,41 @@ if (alias !== 'alias') {
 
 const INCLUDE_COMP_BREAKING_GET_COMPOSITIONS = false;
 
-import {parseMedia} from '@remotion/media-parser';
-import {zMatrix} from '@remotion/zod-types';
-import {ThreeDCheck} from './3DCheck';
-import {ThreeDContext} from './3DContext';
-import {ThreeDEngine} from './3DEngine';
-import {ThreeDSvgContent} from './3DSvgContent';
-import {AnimatedImages} from './AnimatedImage/Avif';
+import { parseMedia } from '@remotion/media-parser';
+import { zMatrix } from '@remotion/zod-types';
+import { ThreeDCheck } from './3DCheck';
+import { ThreeDContext } from './3DContext';
+import { ThreeDEngine } from './3DEngine';
+import { ThreeDSvgContent } from './3DSvgContent';
+import { AnimatedImages } from './AnimatedImage/Avif';
 import Amplify from './AudioTesting/Amplify';
-import {CTAEndCard} from './CallToAction';
+import { CTAEndCard } from './CallToAction';
 import {
 	WhatIsRemotion,
 	whatIsRemotionCalculateMetadata,
 	whatIsRemotionSchema,
 } from './Compose/WhatIsRemotion';
-import {EdgeBlur} from './EdgeBlur/EdgeBlur';
-import {Empty} from './Empty';
-import {JumpCuts, SAMPLE_SECTIONS, calculateMetadataJumpCuts} from './JumpCuts';
-import {NewAudioExample} from './NewAudio/NewAudio';
-import {LoopedOffthreadRemoteVideo} from './OffthreadRemoteVideo/LoopedOffthreadRemoteVideo';
-import {MultiChannelAudio} from './OffthreadRemoteVideo/MultiChannelAudio';
-import {NewVideoComp} from './OffthreadRemoteVideo/NewRemoteVideo';
-import {OffthreadRemoteSeries} from './OffthreadRemoteVideo/OffthreadRemoteSeries';
-import {ParseAndDownloadMedia} from './ParseAndDownloadMedia';
-import {PremountOnTransitionSeries} from './PremountOnTransitionSeries';
-import {PrintProps} from './PrintProps';
-import {SmoothTextTransition} from './SmoothTextTransition';
-import {Seek} from './StudioApis/Seek';
-import {TikTokTextBoxPlayground} from './TikTokTextbox/TikTokTextBox';
-import {FitTextOnNLines, fitTextOnNLinesSchema} from './Title/FitTextOnNLines';
-import {TransitionRounding} from './TransitionRounding';
-import {VideoTestingPlayback} from './VideoTesting/playback';
-import {VideoTestingTrim} from './VideoTesting/trim';
-import {VisualControls} from './VisualControls';
-import {VoiceVisualization} from './voice-visualization';
-import {WhisperWeb} from './WhisperWeb';
+import { EdgeBlur } from './EdgeBlur/EdgeBlur';
+import { Empty } from './Empty';
+import { JumpCuts, SAMPLE_SECTIONS, calculateMetadataJumpCuts } from './JumpCuts';
+import { NewAudioExample } from './NewAudio/NewAudio';
+import { LoopedOffthreadRemoteVideo } from './OffthreadRemoteVideo/LoopedOffthreadRemoteVideo';
+import { MultiChannelAudio } from './OffthreadRemoteVideo/MultiChannelAudio';
+import { NewVideoComp } from './OffthreadRemoteVideo/NewRemoteVideo';
+import { OffthreadRemoteSeries } from './OffthreadRemoteVideo/OffthreadRemoteSeries';
+import { ParseAndDownloadMedia } from './ParseAndDownloadMedia';
+import { PremountOnTransitionSeries } from './PremountOnTransitionSeries';
+import { PrintProps } from './PrintProps';
+import { SmoothTextTransition } from './SmoothTextTransition';
+import { Seek } from './StudioApis/Seek';
+import { TikTokTextBoxPlayground } from './TikTokTextbox/TikTokTextBox';
+import { FitTextOnNLines, fitTextOnNLinesSchema } from './Title/FitTextOnNLines';
+import { TransitionRounding } from './TransitionRounding';
+import { VideoTestingPlayback } from './VideoTesting/playback';
+import { VideoTestingTrim } from './VideoTesting/trim';
+import { VisualControls } from './VisualControls';
+import { VoiceVisualization } from './voice-visualization';
+import { WhisperWeb } from './WhisperWeb';
 
 class Vector2 {
 	readonly x: number;
@@ -178,7 +179,7 @@ export const Index: React.FC = () => {
 	const calculateMetadata: CalculateMetadataFunction<
 		z.infer<typeof dynamicDurationSchema>
 	> = useMemo(() => {
-		return async ({props}) => {
+		return async ({ props }) => {
 			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			const shouldLog = (..._data: unknown[]) => undefined;
 			// To test logging
@@ -193,7 +194,7 @@ export const Index: React.FC = () => {
 			shouldLog('');
 			shouldLog('');
 
-			shouldLog('objects', {a: 'string'});
+			shouldLog('objects', { a: 'string' });
 			shouldLog('boolean:', false);
 			shouldLog('number:', 1);
 			shouldLog('symbol', Symbol('hi'));
@@ -224,7 +225,7 @@ export const Index: React.FC = () => {
 			);
 			shouldLog('Hello World Proxy', new Proxy(document, {}));
 			shouldLog('Hello World RegExp', /abc/);
-			shouldLog('Hello World Set', {a: [1, 2, 3]});
+			shouldLog('Hello World Set', { a: [1, 2, 3] });
 			shouldLog('Hello World TypedArray', new Uint8Array([1, 2, 3]));
 			const wm3 = new WeakMap();
 			const o1 = {};
@@ -257,7 +258,7 @@ export const Index: React.FC = () => {
 		// Enable this for testing, however it will break getCompositions():
 		// throw new Error('Failed to calculate metadata');
 		return {
-			props: {duration: 100},
+			props: { duration: 100 },
 		};
 	}, []);
 
@@ -267,7 +268,7 @@ export const Index: React.FC = () => {
 		// Enable this for testing, however it will break getCompositions():
 		// throw new Error('Failed to calculate metadata');
 		return {
-			props: {duration: 100},
+			props: { duration: 100 },
 		};
 	}, []);
 
@@ -283,7 +284,7 @@ export const Index: React.FC = () => {
 					durationInFrames={100}
 					calculateMetadata={calculateMetadata}
 					schema={dynamicDurationSchema}
-					defaultProps={{duration: 200}}
+					defaultProps={{ duration: 200 }}
 				/>
 				<Composition
 					id="failing-dynamic-length"
@@ -294,7 +295,7 @@ export const Index: React.FC = () => {
 					durationInFrames={100}
 					calculateMetadata={failingCalculateMetadata}
 					schema={dynamicDurationSchema}
-					defaultProps={{duration: 50}}
+					defaultProps={{ duration: 50 }}
 				/>
 				<Composition
 					id="huge-payload"
@@ -356,7 +357,7 @@ export const Index: React.FC = () => {
 					durationInFrames={100}
 					calculateMetadata={syncCalculateMetadata}
 					schema={dynamicDurationSchema}
-					defaultProps={{duration: 50}}
+					defaultProps={{ duration: 50 }}
 				/>
 			</Folder>
 			<Folder name="components">
@@ -678,10 +679,10 @@ export const Index: React.FC = () => {
 					defaultProps={{
 						src: staticFile('music.mp3'),
 					}}
-					calculateMetadata={async ({props}) => {
+					calculateMetadata={async ({ props }) => {
 						const fps = 30;
 
-						const {slowDurationInSeconds} = await parseMedia({
+						const { slowDurationInSeconds } = await parseMedia({
 							src: props.src as string,
 							fields: {
 								slowDurationInSeconds: true,
@@ -886,7 +887,7 @@ export const Index: React.FC = () => {
 				/>
 				<Still
 					id="still-helloworld"
-					defaultProps={{message: 'Hello from default!'}}
+					defaultProps={{ message: 'Hello from default!' }}
 					component={StillHelloWorld}
 					width={1920}
 					height={1080}
@@ -964,7 +965,7 @@ export const Index: React.FC = () => {
 					component={StaticDemo}
 					width={1000}
 					height={1000}
-					defaultProps={{flag: false}}
+					defaultProps={{ flag: false }}
 				/>
 				<Still id="font-demo" component={FontDemo} width={1000} height={1000} />
 				<Composition
@@ -1359,17 +1360,17 @@ export const Index: React.FC = () => {
 					defaultProps={{
 						matrix: [0, 1, 1, 0],
 						union: [
-							{type: 'boat' as const, depth: 10},
-							{type: 'car' as const, color: 'blue', obj: [{link: 'hi there'}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
-							{type: 'car' as const, color: '', obj: [{link: ''}]},
+							{ type: 'boat' as const, depth: 10 },
+							{ type: 'car' as const, color: 'blue', obj: [{ link: 'hi there' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
+							{ type: 'car' as const, color: '', obj: [{ link: '' }] },
 						],
 					}}
 					durationInFrames={150}
@@ -1450,16 +1451,16 @@ export const Index: React.FC = () => {
 						title: 'sdasds',
 						delay: 5.2,
 						color: '#df822a',
-						list: [{name: 'first', age: 12}],
+						list: [{ name: 'first', age: 12 }],
 						matrix: [0, 1, 1, 0],
 						description: 'Sample description \nOn multiple lines',
 						dropdown: 'a' as const,
 						superSchema: [
-							{type: 'a' as const, a: {a: 'hi'}},
-							{type: 'b' as const, b: {b: 'hi'}},
+							{ type: 'a' as const, a: { a: 'hi' } },
+							{ type: 'b' as const, b: { b: 'hi' } },
 						],
-						discriminatedUnion: {type: 'auto'},
-						tuple: ['foo', 42, {a: 'hi'}],
+						discriminatedUnion: { type: 'auto' },
+						tuple: ['foo', 42, { a: 'hi' }],
 					}}
 				/>
 				{/**
@@ -1552,7 +1553,7 @@ export const Index: React.FC = () => {
 					height={200}
 					width={200}
 					schema={saveStudioSchema}
-					defaultProps={{color: 'green'}}
+					defaultProps={{ color: 'green' }}
 				/>
 				<Composition
 					id="seek"
@@ -1562,7 +1563,7 @@ export const Index: React.FC = () => {
 					height={200}
 					width={200}
 					schema={saveStudioSchema}
-					defaultProps={{color: 'green'}}
+					defaultProps={{ color: 'green' }}
 				/>
 				<Composition
 					id="restart-studio"
@@ -1572,7 +1573,7 @@ export const Index: React.FC = () => {
 					height={200}
 					width={200}
 					schema={saveStudioSchema}
-					defaultProps={{color: 'green'}}
+					defaultProps={{ color: 'green' }}
 				/>
 				<Composition
 					id="write-static-file"
@@ -1582,7 +1583,7 @@ export const Index: React.FC = () => {
 					height={200}
 					width={200}
 					schema={saveStudioSchema}
-					defaultProps={{color: 'green'}}
+					defaultProps={{ color: 'green' }}
 				/>
 				<Composition
 					id="delete-static-file"
@@ -1591,7 +1592,7 @@ export const Index: React.FC = () => {
 					durationInFrames={100}
 					height={200}
 					width={200}
-					defaultProps={{color: 'green'}}
+					defaultProps={{ color: 'green' }}
 				/>
 				<Composition
 					id="trigger-calculate-metadata"
@@ -1606,7 +1607,7 @@ export const Index: React.FC = () => {
 						});
 						return {};
 					}}
-					defaultProps={{color: 'green'}}
+					defaultProps={{ color: 'green' }}
 				/>
 			</Folder>
 			<Folder name="Artifacts">
@@ -1682,7 +1683,7 @@ export const Index: React.FC = () => {
 					fps={30}
 					durationInFrames={273}
 					schema={whatIsRemotionSchema}
-					defaultProps={{fade: false, whiteBackground: true, reel: false}}
+					defaultProps={{ fade: false, whiteBackground: true, reel: false }}
 					calculateMetadata={whatIsRemotionCalculateMetadata}
 				/>
 				<Composition
@@ -1766,6 +1767,14 @@ export const Index: React.FC = () => {
 				defaultProps={{
 					cornerRadius: 10,
 				}}
+			/>
+			<Composition
+				id="ai-project"
+				component={AIProject}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={150}
 			/>
 		</>
 	);

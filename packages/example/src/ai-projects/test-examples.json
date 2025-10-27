@@ -1,0 +1,46 @@
+{
+  "examples": [
+    {
+      "name": "Simple Text Fade In",
+      "prompt": "Create a video with text 'Hello World' that fades in",
+      "expectedCode": "import React from 'react';\nimport {AbsoluteFill, useCurrentFrame, interpolate} from 'remotion';\n\nexport const AIGeneratedComponent: React.FC = () => {\n  const frame = useCurrentFrame();\n  \n  const opacity = interpolate(frame, [0, 30], [0, 1], {\n    extrapolateLeft: 'clamp',\n    extrapolateRight: 'clamp',\n  });\n\n  return (\n    <AbsoluteFill\n      style={{\n        backgroundColor: 'white',\n        justifyContent: 'center',\n        alignItems: 'center',\n      }}\n    >\n      <h1\n        style={{\n          fontSize: 100,\n          fontWeight: 'bold',\n          color: 'black',\n          opacity,\n        }}\n      >\n        Hello World\n      </h1>\n    </AbsoluteFill>\n  );\n};\n\nexport default AIGeneratedComponent;"
+    },
+    {
+      "name": "Moving Circle",
+      "prompt": "Animate a blue circle moving from left to right",
+      "expectedCode": "import React from 'react';\nimport {AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate} from 'remotion';\nimport {Circle} from '@remotion/shapes';\n\nexport const AIGeneratedComponent: React.FC = () => {\n  const frame = useCurrentFrame();\n  const {width} = useVideoConfig();\n  \n  const x = interpolate(frame, [0, 90], [100, width - 100]);\n\n  return (\n    <AbsoluteFill style={{backgroundColor: 'white'}}>\n      <div style={{position: 'absolute', left: x, top: '50%', transform: 'translateY(-50%)'}}>\n        <Circle radius={50} fill=\"blue\" />\n      </div>\n    </AbsoluteFill>\n  );\n};\n\nexport default AIGeneratedComponent;"
+    },
+    {
+      "name": "Bounce Text",
+      "prompt": "Show 'Welcome' text with a bounce effect",
+      "expectedCode": "import React from 'react';\nimport {AbsoluteFill, useCurrentFrame, useVideoConfig, spring} from 'remotion';\n\nexport const AIGeneratedComponent: React.FC = () => {\n  const frame = useCurrentFrame();\n  const {fps} = useVideoConfig();\n  \n  const scale = spring({\n    frame,\n    fps,\n    from: 0,\n    to: 1,\n    config: {\n      damping: 10,\n      stiffness: 100,\n    },\n  });\n\n  return (\n    <AbsoluteFill\n      style={{\n        backgroundColor: '#1a1a1a',\n        justifyContent: 'center',\n        alignItems: 'center',\n      }}\n    >\n      <h1\n        style={{\n          fontSize: 120,\n          fontWeight: 'bold',\n          color: 'white',\n          transform: `scale(${scale})`,\n        }}\n      >\n        Welcome\n      </h1>\n    </AbsoluteFill>\n  );\n};\n\nexport default AIGeneratedComponent;"
+    },
+    {
+      "name": "Rotating Square",
+      "prompt": "Create a rotating red square",
+      "expectedCode": "import React from 'react';\nimport {AbsoluteFill, useCurrentFrame, interpolate} from 'remotion';\nimport {Rect} from '@remotion/shapes';\n\nexport const AIGeneratedComponent: React.FC = () => {\n  const frame = useCurrentFrame();\n  \n  const rotation = interpolate(frame, [0, 90], [0, 360]);\n\n  return (\n    <AbsoluteFill\n      style={{\n        backgroundColor: 'white',\n        justifyContent: 'center',\n        alignItems: 'center',\n      }}\n    >\n      <div style={{transform: `rotate(${rotation}deg)`}}>\n        <Rect width={100} height={100} fill=\"red\" />\n      </div>\n    </AbsoluteFill>\n  );\n};\n\nexport default AIGeneratedComponent;"
+    },
+    {
+      "name": "Multi-Element Animation",
+      "prompt": "Show 'Hello' at the top and a spinning blue circle below it",
+      "expectedCode": "import React from 'react';\nimport {AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring} from 'remotion';\nimport {Circle} from '@remotion/shapes';\n\nexport const AIGeneratedComponent: React.FC = () => {\n  const frame = useCurrentFrame();\n  const {fps} = useVideoConfig();\n  \n  const textOpacity = interpolate(frame, [0, 20], [0, 1], {\n    extrapolateLeft: 'clamp',\n    extrapolateRight: 'clamp',\n  });\n  \n  const rotation = interpolate(frame, [20, 110], [0, 360]);\n  \n  const circleScale = spring({\n    frame: Math.max(0, frame - 10),\n    fps,\n    from: 0,\n    to: 1,\n  });\n\n  return (\n    <AbsoluteFill\n      style={{\n        backgroundColor: '#f0f0f0',\n        flexDirection: 'column',\n        justifyContent: 'center',\n        alignItems: 'center',\n        gap: 50,\n      }}\n    >\n      <h1\n        style={{\n          fontSize: 80,\n          fontWeight: 'bold',\n          color: 'black',\n          opacity: textOpacity,\n        }}\n      >\n        Hello\n      </h1>\n      <div style={{\n        transform: `rotate(${rotation}deg) scale(${circleScale})`,\n      }}>\n        <Circle radius={60} fill=\"blue\" />\n      </div>\n    </AbsoluteFill>\n  );\n};\n\nexport default AIGeneratedComponent;"
+    }
+  ],
+  "testInstructions": {
+    "description": "Use these examples to test the AI backend integration",
+    "steps": [
+      "1. Send each prompt to your LLM",
+      "2. Verify the generated code matches the structure",
+      "3. Test the WebSocket message format",
+      "4. Confirm the code compiles in Remotion",
+      "5. Check the animation renders correctly"
+    ],
+    "messageFormat": {
+      "type": "code-generation",
+      "code": "<generated TypeScript/React code>",
+      "prompt": "<original user prompt>",
+      "projectName": "<optional-kebab-case-name>"
+    }
+  }
+}
+

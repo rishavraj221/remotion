@@ -24,24 +24,26 @@
 	},
 	"dependencies": {
 		"@babel/parser": "7.24.1",
-		"semver": "7.5.3",
-		"remotion": "workspace:*",
-		"recast": "0.23.11",
 		"@remotion/bundler": "workspace:*",
 		"@remotion/renderer": "workspace:*",
 		"@remotion/studio-shared": "workspace:*",
 		"memfs": "3.4.3",
+		"open": "^8.4.2",
+		"recast": "0.23.11",
+		"remotion": "workspace:*",
+		"semver": "7.5.3",
 		"source-map": "0.7.3",
-		"open": "^8.4.2"
+		"ws": "^8.18.3"
 	},
 	"devDependencies": {
-		"ast-types": "0.16.1",
-		"react": "catalog:",
 		"@babel/types": "7.24.0",
-		"@types/semver": "^7.3.4",
 		"@remotion/eslint-config-internal": "workspace:*",
+		"@types/node": "catalog:",
+		"@types/semver": "^7.3.4",
+		"@types/ws": "^8.18.1",
+		"ast-types": "0.16.1",
 		"eslint": "catalog:",
-		"@types/node": "catalog:"
+		"react": "catalog:"
 	},
 	"exports": {
 		".": "./dist/index.js",
