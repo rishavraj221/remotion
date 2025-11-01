@@ -104,6 +104,9 @@ export type ModalState =
 			type: 'quick-switcher';
 			mode: QuickSwitcherMode;
 			invocationTimestamp: number;
+	  }
+	| {
+			type: 'new-ai-composition';
 	  };
 
 export type ModalContextType = {

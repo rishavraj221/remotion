@@ -1,10 +1,10 @@
 // This file is not compiled by Typescript, but by ESBuild
 // to keep the dynamic import
 
-import React, {useContext, useEffect, useRef, useState} from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 // @ts-expect-error
 // eslint-disable-next-line react/no-deprecated
-import type {render} from 'react-dom';
+import type { render } from 'react-dom';
 // In React 18, you should use createRoot() from "react-dom/client".
 // In React 18, you should use render from "react-dom".
 // We support both, but Webpack chooses both of them and normalizes them to "react-dom/client",
@@ -25,7 +25,7 @@ import {
 	Internals,
 	useDelayRender,
 } from 'remotion';
-import {NoReactInternals} from 'remotion/no-react';
+import { NoReactInternals } from 'remotion/no-react';
 
 let currentBundleMode: BundleState = {
 	type: 'index',
@@ -95,14 +95,14 @@ const DelayedSpinner: React.FC = () => {
 
 const GetVideoComposition: React.FC<{
 	readonly state: BundleCompositionState;
-}> = ({state}) => {
-	const {compositions, currentCompositionMetadata, canvasContent} = useContext(
+}> = ({ state }) => {
+	const { compositions, currentCompositionMetadata, canvasContent } = useContext(
 		Internals.CompositionManager,
 	);
-	const {setCanvasContent} = useContext(Internals.CompositionSetters);
+	const { setCanvasContent } = useContext(Internals.CompositionSetters);
 
 	const portalContainer = useRef<HTMLDivElement>(null);
-	const {delayRender, continueRender} = useDelayRender();
+	const { delayRender, continueRender } = useDelayRender();
 	const [handle] = useState(() =>
 		delayRender(`Waiting for Composition "${state.compositionName}"`),
 	);
@@ -121,8 +121,7 @@ const GetVideoComposition: React.FC<{
 		) as _InternalTypes['AnyComposition'];
 		if (!foundComposition) {
 			throw new Error(
-				`Found no composition with the name ${
-					state.compositionName
+				`Found no composition with the name ${state.compositionName
 				}. The following compositions were found instead: ${compositions
 					.map((c) => c.id)
 					.join(
@@ -142,7 +141,7 @@ const GetVideoComposition: React.FC<{
 			return;
 		}
 
-		const {current} = portalContainer;
+		const { current } = portalContainer;
 		if (!current) {
 			throw new Error('portal did not render');
 		}
@@ -208,7 +207,7 @@ const renderToDOM = (content: React.ReactElement) => {
 			);
 		}
 
-		(ReactDOM as unknown as {render: typeof render}).render(
+		(ReactDOM as unknown as { render: typeof render }).render(
 			content,
 			videoContainer,
 		);
@@ -282,7 +281,7 @@ const renderContent = (Root: React.FC) => {
 			</div>,
 		);
 		import('./internals')
-			.then(({StudioInternals}) => {
+			.then(({ StudioInternals }) => {
 				window.remotion_isStudio = true;
 				window.remotion_isReadOnlyStudio = true;
 
@@ -330,11 +329,11 @@ if (typeof window !== 'undefined') {
 		const canSerializeDefaultProps = getCanSerializeDefaultProps(compositions);
 		if (!canSerializeDefaultProps) {
 			Internals.Log.warn(
-				{logLevel: window.remotion_logLevel, tag: null},
+				{ logLevel: window.remotion_logLevel, tag: null },
 				'defaultProps are too big to serialize - trying to find the problematic composition...',
 			);
 			Internals.Log.warn(
-				{logLevel: window.remotion_logLevel, tag: null},
+				{ logLevel: window.remotion_logLevel, tag: null },
 				'Serialization:',
 				compositions,
 			);
@@ -347,7 +346,7 @@ if (typeof window !== 'undefined') {
 			}
 
 			Internals.Log.warn(
-				{logLevel: window.remotion_logLevel, tag: null},
+				{ logLevel: window.remotion_logLevel, tag: null },
 				'Could not single out a problematic composition -  The composition list as a whole is too big to serialize.',
 			);
 
@@ -394,7 +393,7 @@ if (typeof window !== 'undefined') {
 
 				const resolved = await Promise.resolve(comp);
 				globalContinueRender(handle);
-				const {props, defaultProps, ...data} = resolved;
+				const { props, defaultProps, ...data } = resolved;
 
 				return {
 					...data,
@@ -460,7 +459,7 @@ if (typeof window !== 'undefined') {
 		);
 		globalContinueRender(handle);
 
-		const {props, defaultProps, ...data} = prom;
+		const { props, defaultProps, ...data } = prom;
 		return {
 			...data,
 			serializedResolvedPropsWithCustomSchema:

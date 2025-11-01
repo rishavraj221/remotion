@@ -1,6 +1,6 @@
-export const BACKGROUND = 'rgb(31,36,40)';
-export const BACKGROUND__TRANSPARENT = 'rgba(31,36,40, 0)';
-export const INPUT_BACKGROUND = '#2f363d';
+export const BACKGROUND = 'rgb(0,0,0)';
+export const BACKGROUND__TRANSPARENT = 'rgba(0,0,0, 0)';
+export const INPUT_BACKGROUND = '#333333';
 export const BORDER_COLOR = '#000';
 export const LIGHT_COLOR = '#ddd';
 export const SELECTED_BACKGROUND = 'hsla(0, 0%, 100%, 0.15)';

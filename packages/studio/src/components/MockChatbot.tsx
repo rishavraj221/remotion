@@ -1,8 +1,9 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect, useContext } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { BACKGROUND, INPUT_BACKGROUND, BLUE, TEXT_COLOR } from '../helpers/colors';
+import { Internals } from 'remotion';
 import 'highlight.js/styles/github-dark.css';
 
 const container: React.CSSProperties = {
@@ -240,6 +241,18 @@ type Message = {
 	timestamp: Date;
 };
 
+interface Composition {
+	id: string;
+	name: string;
+	width: number;
+	height: number;
+	fps: number;
+	durationInFrames: number;
+	createdAt: number;
+	updatedAt: number;
+	chatHistory: Array<{ role: 'user' | 'assistant' | 'system'; content: string; timestamp: number }>;
+}
+
 export const MockChatbot: React.FC = () => {
 	const [messages, setMessages] = useState<Message[]>([
 		{
@@ -251,8 +264,32 @@ export const MockChatbot: React.FC = () => {
 	const [input, setInput] = useState('');
 	const [connected, setConnected] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
+	const [compositions, setCompositions] = useState<Composition[]>([]);
+	const [selectedCompositionId, setSelectedCompositionId] = useState<string | null>(null);
 	const wsRef = useRef<WebSocket | null>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
+
+	// Get currently selected composition from Remotion
+	const { canvasContent } = useContext(Internals.CompositionManager);
+
+	// Auto-select AI composition when it's selected in the sidebar
+	useEffect(() => {
+		if (canvasContent && canvasContent.type === 'composition') {
+			const compositionId = canvasContent.compositionId;
+			// Check if this composition exists in our AI compositions list
+			const isAIComposition = compositions.some(c => c.id === compositionId);
+			if (isAIComposition && compositionId !== selectedCompositionId) {
+				setSelectedCompositionId(compositionId);
+				// Send select message to backend to load chat history
+				if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+					wsRef.current.send(JSON.stringify({
+						type: 'select-composition',
+						compositionId: compositionId,
+					}));
+				}
+			}
+		}
+	}, [canvasContent, compositions, selectedCompositionId]);
 
 	useEffect(() => {
 		const ws = new WebSocket('ws://localhost:3000/ai-ws');
@@ -267,7 +304,10 @@ export const MockChatbot: React.FC = () => {
 					sender: 'status',
 					timestamp: new Date()
 				}
-			])
+			]);
+
+			// Request compositions list
+			ws.send(JSON.stringify({ type: 'get-compositions' }));
 		}
 
 		ws.onmessage = async (event) => {
@@ -292,11 +332,58 @@ export const MockChatbot: React.FC = () => {
 
 				setIsLoading(false); // Stop loading indicator
 
-				// Handle code-generated messages specially
+				// Handle different message types
+				if (data.type === 'compositions-list') {
+					setCompositions(data.compositions || []);
+					if (data.compositions && data.compositions.length > 0 && !selectedCompositionId) {
+						// Auto-select first composition
+						setSelectedCompositionId(data.compositions[0].id);
+						ws.send(JSON.stringify({ type: 'select-composition', compositionId: data.compositions[0].id }));
+					}
+					return;
+				}
+
+				if (data.type === 'composition-selected') {
+					setSelectedCompositionId(data.composition.id);
+					// Clear existing messages and load chat history for the selected composition
+					if (data.chatHistory && data.chatHistory.length > 0) {
+						const historyMessages: Message[] = data.chatHistory.map((msg: { role: string; content: string; timestamp?: number }) => ({
+							text: msg.content,
+							sender: msg.role === 'user' ? 'user' : 'bot',
+							timestamp: new Date(msg.timestamp || Date.now()),
+						}));
+						setMessages([
+							{
+								text: `Switched to composition: **${data.composition.name}**`,
+								sender: 'status',
+								timestamp: new Date(),
+							},
+							...historyMessages,
+						]);
+					} else {
+						// No chat history - start fresh for this composition
+						setMessages([
+							{
+								text: `Switched to composition: **${data.composition.name}**\n\nHello! How can I help you edit this composition?`,
+								sender: 'bot',
+								timestamp: new Date(),
+							},
+						]);
+					}
+					return;
+				}
+
+				if (data.type === 'composition-created') {
+					setCompositions((prev) => [...prev, data.composition]);
+					setSelectedCompositionId(data.composition.id);
+					ws.send(JSON.stringify({ type: 'select-composition', compositionId: data.composition.id }));
+				}
+
+				// Handle code-generated/updated messages specially
 				let messageContent = data.content || JSON.stringify(data);
-				if (data.type === 'code-generated') {
+				if (data.type === 'code-generated' || data.type === 'code-updated') {
 					if (data.success) {
-						messageContent = `${data.content}\n\n**Tip:** Switch to the "ai-project" composition in the sidebar to view your generated video!`;
+						messageContent = `${data.content}\n\n**Tip:** Switch to the "${data.compositionId || 'composition'}" composition in the sidebar to view your video!`;
 					} else {
 						messageContent = data.content;
 					}
@@ -362,6 +449,18 @@ export const MockChatbot: React.FC = () => {
 	const handleSend = useCallback(() => {
 		if (!input.trim() || !wsRef.current) return;
 
+		if (!selectedCompositionId) {
+			setMessages((prev) => [
+				...prev,
+				{
+					text: '⚠️ Please create or select a composition first!',
+					sender: 'bot',
+					timestamp: new Date(),
+				},
+			]);
+			return;
+		}
+
 		const userMessage: Message = {
 			text: input,
 			sender: 'user',
@@ -373,11 +472,13 @@ export const MockChatbot: React.FC = () => {
 
 		wsRef.current.send(JSON.stringify({
 			type: 'chat',
-			message: input
-		}))
+			message: input,
+			compositionId: selectedCompositionId,
+		}));
 
 		setInput('');
-	}, [input]);
+	}, [input, selectedCompositionId]);
+
 
 	const handleKeyPress = useCallback(
 		(e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -400,6 +501,22 @@ export const MockChatbot: React.FC = () => {
 				}} />
 				Kureita AI
 			</div>
+			{selectedCompositionId && (
+				<div style={{
+					marginBottom: '12px',
+					padding: '8px 12px',
+					backgroundColor: INPUT_BACKGROUND,
+					border: '1px solid rgba(255, 255, 255, 0.08)',
+					borderRadius: '6px',
+					fontSize: '12px',
+					color: TEXT_COLOR,
+				}}>
+					<span style={{ opacity: 0.7 }}>Editing: </span>
+					<span style={{ fontWeight: 500 }}>
+						{compositions.find(c => c.id === selectedCompositionId)?.name || selectedCompositionId}
+					</span>
+				</div>
+			)}
 			<div style={messagesContainer}>
 				{messages.map((message, index) => (
 					<div
@@ -435,7 +552,7 @@ export const MockChatbot: React.FC = () => {
 					value={input}
 					onChange={(e) => setInput(e.target.value)}
 					onKeyPress={handleKeyPress}
-					placeholder="Type your message..."
+					placeholder={selectedCompositionId ? "Type your message..." : "Select an AI composition from the sidebar..."}
 					style={inputStyle}
 					disabled={!connected}
 				/>

@@ -1,85 +1,174 @@
 import type { Server as HTTPServer } from 'node:http';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
+import { CompositionManager } from './composition-manager';
+import { generateCompositionLoader } from './composition-loader-generator';
+import { validateCode, formatErrorsForLLM } from './code-validator';
 
 export type AIWebSocketMessage = 
-  | {type: 'chat'; message: string}
+  | {type: 'chat'; message: string; compositionId?: string}
+  | {type: 'create-composition'; name: string; width?: number; height?: number; fps?: number; durationInFrames?: number}
+  | {type: 'select-composition'; compositionId: string}
+  | {type: 'delete-composition'; compositionId: string}
+  | {type: 'rename-composition'; compositionId: string; newName: string}
+  | {type: 'duplicate-composition'; compositionId: string; newName: string; width?: number; height?: number; fps?: number; durationInFrames?: number}
   | {type: 'code-update'; file: string; content: string; action: 'create' | 'update' | 'delete'}
-  | {type: 'code-generation'; code: string; prompt: string; projectName?: string}
+  | {type: 'code-generation'; code: string; prompt: string; projectName?: string; compositionId?: string}
+  | {type: 'code-edit'; compositionId: string; code: string; prompt: string; width?: number; height?: number; fps?: number; durationInFrames?: number}
+  | {type: 'get-compositions'}
   | {type: 'status'; status: string};
 
 const AI_BACKEND_WS_URL = 'ws://localhost:8000';
 
 let aiBackendConnection: WebSocket | null = null;
 
-// Helper function to write AI-generated code to file
-const writeAIProject = (code: string, _prompt: string, projectName?: string): {success: boolean; filename?: string; error?: string} => {
-  try {
-    // Get the ai-projects directory path
-    // Assuming this file is in studio-server/src, we need to go to example/src/ai-projects
-    const projectRoot = path.resolve(__dirname, '../../example/src/ai-projects');
-    
-    // Ensure directory exists
-    if (!fs.existsSync(projectRoot)) {
-      fs.mkdirSync(projectRoot, { recursive: true });
-    }
+// Initialize composition manager
+const projectRoot = path.resolve(__dirname, '../../example/src/ai-projects');
+const compositionManager = new CompositionManager(projectRoot);
 
-    // Generate filename
-    const timestamp = Date.now();
-    const safeName = projectName 
-      ? projectName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
-      : 'project';
-    const filename = `generated-${safeName}-${timestamp}.tsx`;
-    const filepath = path.join(projectRoot, filename);
+// Store selected composition ID per WebSocket connection
+const connectionState = new Map<WebSocket, { selectedCompositionId?: string }>();
 
-    // Write the generated code
-    fs.writeFileSync(filepath, code, 'utf-8');
+// Maximum number of retry attempts for error fixing
+const MAX_ERROR_RETRY_ATTEMPTS = 3;
 
-    // Create/update current-project.tsx to point to this new file
-    // This file is imported by index.tsx dynamically
-    // Since it's in .gitignore, it won't persist across restarts
-    const currentProjectPath = path.join(projectRoot, 'current-project.tsx');
-    const reExportStatement = `// Auto-generated: Current active project\n// This file is temporary and will be reset on browser refresh/restart\nimport AIGeneratedComponent from './${filename.replace('.tsx', '')}';\n\nexport { AIGeneratedComponent };\nexport default AIGeneratedComponent;\n`;
-    
-    fs.writeFileSync(currentProjectPath, reExportStatement, 'utf-8');
-
-    console.log(`✅ AI project written to: ${filepath}`);
-    console.log(`✅ Current project updated: current-project.tsx → ${filename}`);
-    
-    return { success: true, filename };
-  } catch (error) {
-    console.error('❌ Error writing AI project:', error);
-    return { success: false, error: String(error) };
-  }
-};
-
-// Reset current-project.tsx to default state on studio start
-const resetCurrentProject = () => {
-  try {
-    const projectRoot = path.resolve(__dirname, '../../example/src/ai-projects');
-    const currentProjectPath = path.join(projectRoot, 'current-project.tsx');
-    
-    const defaultContent = `/**
- * This file is auto-managed by the AI backend.
- * 
- * DEFAULT STATE: Exports null (shows placeholder)
- * AFTER GENERATION: Gets overwritten to export the generated component
- * 
- * Note: This file is tracked in git to prevent build errors,
- * but will be overwritten dynamically during runtime.
+/**
+ * Handles code editing with automatic error detection and retry
  */
-
-// Default export is null - this tells index.tsx to show placeholder
-export default null;
-`;
-    
-    fs.writeFileSync(currentProjectPath, defaultContent, 'utf-8');
-    console.log('✅ Reset current-project.tsx to default state');
-  } catch (error) {
-    console.error('⚠️ Could not reset current-project.tsx:', error);
+async function handleCodeEditWithErrorChecking(
+  compositionId: string,
+  code: string,
+  width: number | undefined,
+  height: number | undefined,
+  fps: number | undefined,
+  durationInFrames: number | undefined,
+  explanation: string | undefined,
+  ws: WebSocket,
+  retryAttempt: number = 0
+): Promise<void> {
+  const composition = compositionManager.getComposition(compositionId);
+  if (!composition) {
+    ws.send(JSON.stringify({
+      type: 'code-updated',
+      success: false,
+      error: 'Composition not found',
+      content: `❌ Composition not found`
+    }));
+    return;
   }
-};
+
+  // Update the code file
+  const success = compositionManager.updateCompositionCode(compositionId, code);
+  if (!success) {
+    ws.send(JSON.stringify({
+      type: 'code-updated',
+      success: false,
+      error: 'Failed to update composition file',
+      content: `❌ Failed to update composition`
+    }));
+    return;
+  }
+
+  // Validate the code for errors
+  const filePath = path.resolve(projectRoot, composition.filePath);
+  const tsconfigPath = path.resolve(__dirname, '../../example/tsconfig.json');
+  const validation = await validateCode(code, filePath, tsconfigPath);
+
+  if (!validation.valid && validation.errors.length > 0) {
+    console.log(`❌ Code has ${validation.errors.length} error(s), attempt ${retryAttempt + 1}/${MAX_ERROR_RETRY_ATTEMPTS}`);
+    
+    // If we haven't exceeded max retries, ask LLM to fix the errors
+    if (retryAttempt < MAX_ERROR_RETRY_ATTEMPTS) {
+      console.log('🔄 Requesting LLM to fix errors...');
+      
+      // Get existing code (the one that was just written, which has errors)
+      const existingCode = compositionManager.getCompositionCode(compositionId);
+      
+      // Send error-fixing request to AI backend
+      if (aiBackendConnection && aiBackendConnection.readyState === WebSocket.OPEN) {
+        const errorFixPrompt = `Fix the following errors in the code:\n\n${formatErrorsForLLM(validation.errors)}`;
+        
+        aiBackendConnection.send(JSON.stringify({
+          type: 'chat',
+          message: errorFixPrompt,
+          compositionId,
+          existingCode: existingCode || undefined,
+          previousErrors: validation.errors,
+          retryAttempt: retryAttempt + 1,
+        }));
+        
+        // Send status message to client
+        ws.send(JSON.stringify({
+          type: 'code-updated',
+          success: false,
+          hasErrors: true,
+          retryAttempt: retryAttempt + 1,
+          errors: validation.errors,
+          content: `⚠️ Found ${validation.errors.length} error(s) in the code. Attempting to fix automatically (attempt ${retryAttempt + 1}/${MAX_ERROR_RETRY_ATTEMPTS})...`
+        }));
+      } else {
+        ws.send(JSON.stringify({
+          type: 'code-updated',
+          success: false,
+          hasErrors: true,
+          errors: validation.errors,
+          content: `❌ Code has ${validation.errors.length} error(s) and AI backend is not available:\n\n${formatErrorsForLLM(validation.errors)}`
+        }));
+      }
+      return;
+    } else {
+      // Max retries exceeded
+      console.log('❌ Max retry attempts exceeded');
+      ws.send(JSON.stringify({
+        type: 'code-updated',
+        success: false,
+        hasErrors: true,
+        errors: validation.errors,
+        content: `❌ Unable to fix errors after ${MAX_ERROR_RETRY_ATTEMPTS} attempts. Please review the errors:\n\n${formatErrorsForLLM(validation.errors)}`
+      }));
+      return;
+    }
+  }
+
+  // Code is valid - proceed with normal update
+  // Update composition properties if provided
+  if (width || height || fps || durationInFrames) {
+    compositionManager.updateComposition(compositionId, {
+      width,
+      height,
+      fps,
+      durationInFrames,
+    });
+  }
+  
+  // Save assistant response to chat history
+  if (explanation) {
+    compositionManager.addChatMessage(compositionId, 'assistant', explanation);
+  }
+  
+  // Regenerate composition loader in case properties changed
+  generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+  
+  const updatedComposition = compositionManager.getComposition(compositionId);
+  
+  // Send code update confirmation
+  ws.send(JSON.stringify({
+    type: 'code-updated',
+    success: true,
+    compositionId,
+    composition: updatedComposition,
+    content: retryAttempt > 0 
+      ? `✅ Composition updated successfully after fixing errors!\n\nThe composition will hot-reload automatically.`
+      : `✅ Composition updated successfully!\n\nThe composition will hot-reload automatically.`
+  }));
+  
+  // Also send updated compositions list to refresh UI
+  const compositions = compositionManager.getAllCompositions();
+  ws.send(JSON.stringify({
+    type: 'compositions-list',
+    compositions,
+  }));
+}
 
 const connectToAIBackend = () => {
   console.log(`Connecting to AI backend at ${AI_BACKEND_WS_URL}...`);
@@ -90,9 +179,22 @@ const connectToAIBackend = () => {
     console.log('Connected to AI backend');
   };
 
-  aiBackendConnection.onmessage = (data) => {
-    console.log('Received from AI backend:', data.toString());
-  };
+  // Use EventEmitter API for ws library (Node.js)
+  aiBackendConnection.on('message', (data: WebSocket.RawData) => {
+    try {
+      const messageStr = data.toString();
+      console.log('Received from AI backend:', messageStr);
+      // Try to parse and log prettily if it's JSON
+      try {
+        const parsed = JSON.parse(messageStr);
+        console.log('Parsed message:', JSON.stringify(parsed, null, 2));
+      } catch {
+        // Not JSON, that's fine
+      }
+    } catch (error) {
+      console.error('Error processing AI backend message for logging:', error);
+    }
+  });
 
   aiBackendConnection.onerror = (error) => {
     console.error('AI backend connection error:', error);
@@ -107,20 +209,229 @@ const connectToAIBackend = () => {
 
 export const makeAIWebSocketServer = (server: HTTPServer) => {
   const wss = new WebSocketServer({ server, path: '/ai-ws' });
-
-  // Reset to default state on studio start
-  resetCurrentProject();
   
   connectToAIBackend();
 
   wss.on('connection', (ws) => {
     console.log('AI WebSocket client connected');
+    
+    // Initialize connection state
+    connectionState.set(ws, {});
+    
+    // Send list of compositions on connect
+    const compositions = compositionManager.getAllCompositions();
+    ws.send(JSON.stringify({
+      type: 'compositions-list',
+      compositions,
+    }));
 
     ws.on('message', (data) => {
       try {
         const message: AIWebSocketMessage = JSON.parse(data.toString());
         console.log('Received from client:', message);
 
+        // Handle local messages that don't need AI backend
+        if (message.type === 'create-composition') {
+          try {
+            const composition = compositionManager.createComposition(message.name, {
+              width: message.width,
+              height: message.height,
+              fps: message.fps,
+              durationInFrames: message.durationInFrames,
+            });
+            
+            // Regenerate composition loader
+            generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+            
+            ws.send(JSON.stringify({
+              type: 'composition-created',
+              composition,
+            }));
+            
+            // Broadcast updated list
+            const compositions = compositionManager.getAllCompositions();
+            ws.send(JSON.stringify({
+              type: 'compositions-list',
+              compositions,
+            }));
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: (error as Error).message || 'Failed to create composition'
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'select-composition') {
+          const state = connectionState.get(ws);
+          if (state) {
+            state.selectedCompositionId = message.compositionId;
+          }
+          
+          const composition = compositionManager.getComposition(message.compositionId);
+          if (composition) {
+            ws.send(JSON.stringify({
+              type: 'composition-selected',
+              composition,
+              chatHistory: composition.chatHistory,
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'delete-composition') {
+          try {
+            const success = compositionManager.deleteComposition(message.compositionId);
+            if (success) {
+              // Regenerate composition loader
+              generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+              
+              ws.send(JSON.stringify({
+                type: 'composition-deleted',
+                compositionId: message.compositionId,
+                success: true,
+              }));
+              
+              // Send updated list
+              const compositions = compositionManager.getAllCompositions();
+              ws.send(JSON.stringify({
+                type: 'compositions-list',
+                compositions,
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'error',
+                content: `Failed to delete composition: composition not found`
+              }));
+            }
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `Failed to delete composition: ${(error as Error).message}`
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'rename-composition') {
+          try {
+            const composition = compositionManager.renameComposition(message.compositionId, message.newName);
+            if (composition) {
+              // Regenerate composition loader (ID might have changed)
+              generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+              
+              ws.send(JSON.stringify({
+                type: 'composition-renamed',
+                oldCompositionId: message.compositionId,
+                composition,
+                success: true,
+              }));
+              
+              // Send updated list
+              const compositions = compositionManager.getAllCompositions();
+              ws.send(JSON.stringify({
+                type: 'compositions-list',
+                compositions,
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'error',
+                content: `Failed to rename composition: composition not found`
+              }));
+            }
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `Failed to rename composition: ${(error as Error).message}`
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'duplicate-composition') {
+          try {
+            const composition = compositionManager.duplicateComposition(message.compositionId, message.newName, {
+              width: message.width,
+              height: message.height,
+              fps: message.fps,
+              durationInFrames: message.durationInFrames,
+            });
+            if (composition) {
+              // Regenerate composition loader
+              generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+              
+              ws.send(JSON.stringify({
+                type: 'composition-duplicated',
+                composition,
+                success: true,
+              }));
+              
+              // Send updated list
+              const compositions = compositionManager.getAllCompositions();
+              ws.send(JSON.stringify({
+                type: 'compositions-list',
+                compositions,
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'error',
+                content: `Failed to duplicate composition: composition not found`
+              }));
+            }
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `Failed to duplicate composition: ${(error as Error).message}`
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'get-compositions') {
+          const compositions = compositionManager.getAllCompositions();
+          ws.send(JSON.stringify({
+            type: 'compositions-list',
+            compositions,
+          }));
+          return;
+        }
+
+        // Forward chat messages to AI backend with composition context
+        if (message.type === 'chat') {
+          const state = connectionState.get(ws);
+          const compositionId = message.compositionId || state?.selectedCompositionId;
+          
+          if (compositionId) {
+            // Save user message to chat history
+            compositionManager.addChatMessage(compositionId, 'user', message.message);
+          }
+
+          if (aiBackendConnection && aiBackendConnection.readyState === WebSocket.OPEN) {
+            // If editing an existing composition, read the current code to pass to LLM
+            let existingCode: string | undefined;
+            if (compositionId) {
+              const code = compositionManager.getCompositionCode(compositionId);
+              existingCode = code || undefined;
+            }
+            
+            // Include composition ID and existing code in message to backend
+            aiBackendConnection.send(JSON.stringify({
+              ...message,
+              compositionId,
+              existingCode,
+            }));
+          } else {
+            console.error('AI backend not connected');
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `AI backend not available. Please try again later.`
+            }));
+          }
+          return;
+        }
+
+        // Forward other messages to AI backend
         if (aiBackendConnection && aiBackendConnection.readyState === WebSocket.OPEN) {
           aiBackendConnection.send(JSON.stringify(message));
         } else {
@@ -140,37 +451,99 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
       }
     });
 
-    const aiBackendMessageHandler = (data: WebSocket.RawData) => {
-      console.log('Received from AI backend:', data.toString());
-      
+    const aiBackendMessageHandler = async (data: WebSocket.RawData) => {
       try {
         const message = JSON.parse(data.toString());
-
-        console.log('Message:', message);
+        console.log('📨 Processing AI backend message:', message.type || 'unknown');
         
-        // Check if this is a code generation message
-        if (message.type === 'code-generation') {
-          console.log('🎨 Processing code generation request...');
-          const result = writeAIProject(message.code, message.prompt, message.projectName);
+        const state = connectionState.get(ws);
+        const compositionId = message.compositionId || state?.selectedCompositionId;
+        
+        // Check if this is a code generation or edit message
+        if (message.type === 'code-generation' || message.type === 'code-edit') {
+          console.log('🎨 Processing code update request...');
           
-          if (result.success) {
-            // Send success message to frontend
-            ws.send(JSON.stringify({
-              type: 'code-generated',
-              success: true,
-              filename: result.filename,
-              prompt: message.prompt,
-              content: `✅ Project created successfully! File: ${result.filename}\n\nThe composition will hot-reload automatically.`
-            }));
-          } else {
-            // Send error message to frontend
-            ws.send(JSON.stringify({
-              type: 'code-generated',
-              success: false,
-              error: result.error,
-              content: `❌ Failed to create project: ${result.error}`
-            }));
+          if (message.type === 'code-edit' && compositionId) {
+            // Edit existing composition with error checking
+            await handleCodeEditWithErrorChecking(
+              compositionId,
+              message.code,
+              message.width,
+              message.height,
+              message.fps,
+              message.durationInFrames,
+              message.explanation,
+              ws,
+              message.retryAttempt || 0
+            );
+          } else if (message.type === 'code-generation') {
+            // Legacy: Create new file (for backward compatibility)
+            // This should now create a new composition if no compositionId is provided
+            const projectName = message.projectName || 'new-project';
+            
+            if (compositionId) {
+              // Edit existing
+              const success = compositionManager.updateCompositionCode(compositionId, message.code);
+              if (success && message.explanation) {
+                compositionManager.addChatMessage(compositionId, 'assistant', message.explanation);
+              }
+              
+              // Regenerate composition loader
+              generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+              
+              const composition = compositionManager.getComposition(compositionId);
+              ws.send(JSON.stringify({
+                type: 'code-updated',
+                success: true,
+                compositionId,
+                composition,
+                content: `✅ Composition updated successfully!`
+              }));
+              
+              // Also send updated compositions list to refresh UI
+              const compositions = compositionManager.getAllCompositions();
+              ws.send(JSON.stringify({
+                type: 'compositions-list',
+                compositions,
+              }));
+            } else {
+              // Create new composition
+              const composition = compositionManager.createComposition(projectName);
+              compositionManager.updateCompositionCode(composition.id, message.code);
+              if (message.explanation) {
+                compositionManager.addChatMessage(composition.id, 'assistant', message.explanation);
+              }
+              
+              // Regenerate composition loader
+              generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+              
+              ws.send(JSON.stringify({
+                type: 'composition-created',
+                composition,
+                content: `✅ New composition created: ${composition.name}\n\nThe composition will hot-reload automatically.`
+              }));
+              
+              // Send updated compositions list
+              const compositions = compositionManager.getAllCompositions();
+              ws.send(JSON.stringify({
+                type: 'compositions-list',
+                compositions,
+              }));
+              
+              // Update selected composition
+              if (state) {
+                state.selectedCompositionId = composition.id;
+              }
+            }
           }
+        } else if (message.type === 'response') {
+          // Regular chat response - save to history
+          if (compositionId && message.content) {
+            compositionManager.addChatMessage(compositionId, 'assistant', message.content);
+          }
+          
+          // Forward other messages as-is
+          ws.send(data);
         } else {
           // Forward other messages as-is
           ws.send(data);
@@ -187,6 +560,7 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
     
     ws.on('close', () => {
       console.log('AI WebSocket client disconnected');
+      connectionState.delete(ws);
       if (aiBackendConnection) {
         aiBackendConnection.off('message', aiBackendMessageHandler);
       }

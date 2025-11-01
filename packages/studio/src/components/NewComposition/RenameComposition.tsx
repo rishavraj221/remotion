@@ -1,20 +1,21 @@
-import type {RecastCodemod} from '@remotion/studio-shared';
-import type {ChangeEventHandler} from 'react';
-import React, {useCallback, useContext, useMemo, useState} from 'react';
-import {Internals} from 'remotion';
-import {validateCompositionName} from '../../helpers/validate-new-comp-data';
-import {ModalFooterContainer} from '../ModalFooter';
-import {ModalHeader} from '../ModalHeader';
+import type { RecastCodemod } from '@remotion/studio-shared';
+import type { ChangeEventHandler } from 'react';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
+import { Internals } from 'remotion';
+import { validateCompositionName } from '../../helpers/validate-new-comp-data';
+import { ModalFooterContainer } from '../ModalFooter';
+import { ModalHeader } from '../ModalHeader';
 import {
 	ResolveCompositionBeforeModal,
 	ResolvedCompositionContext,
 } from '../RenderModal/ResolveCompositionBeforeModal';
-import {label, optionRow, rightRow} from '../RenderModal/layout';
-import {Spacing} from '../layout';
-import {CodemodFooter} from './CodemodFooter';
-import {DismissableModal} from './DismissableModal';
-import {RemotionInput} from './RemInput';
-import {ValidationMessage} from './ValidationMessage';
+import { label, optionRow, rightRow } from '../RenderModal/layout';
+import { Spacing } from '../layout';
+import { AICodemodFooter } from './AICodemodFooter';
+import { DismissableModal } from './DismissableModal';
+import { RemotionInput } from './RemInput';
+import { useAIWebSocket } from './useAIWebSocket';
+import { ValidationMessage } from './ValidationMessage';
 
 const content: React.CSSProperties = {
 	padding: 12,
@@ -30,9 +31,10 @@ const RenameCompositionLoaded: React.FC<{}> = () => {
 		throw new Error('Resolved composition context');
 	}
 
-	const {resolved} = context;
+	const { resolved } = context;
+	const { sendMessage } = useAIWebSocket();
 
-	const {compositions} = useContext(Internals.CompositionManager);
+	const { compositions } = useContext(Internals.CompositionManager);
 	const [newId, setName] = useState(() => {
 		return resolved.result.id;
 	});
@@ -58,6 +60,14 @@ const RenameCompositionLoaded: React.FC<{}> = () => {
 			newId,
 		};
 	}, [newId, resolved.result.id]);
+
+	const onAIFallback = useCallback(async () => {
+		await sendMessage({
+			type: 'rename-composition',
+			compositionId: resolved.result.id,
+			newName: newId,
+		});
+	}, [resolved.result.id, newId, sendMessage]);
 
 	const onSubmit: React.FormEventHandler<HTMLFormElement> = useCallback((e) => {
 		e.preventDefault();
@@ -96,14 +106,15 @@ const RenameCompositionLoaded: React.FC<{}> = () => {
 					</div>
 				</div>
 				<ModalFooterContainer>
-					<CodemodFooter
+					<AICodemodFooter
 						loadingNotification={'Renaming...'}
 						errorNotification={'Could not rename composition'}
 						successNotification={`Renamed to ${newId}`}
 						genericSubmitLabel={'Rename'}
-						submitLabel={({relativeRootPath}) => `Modify ${relativeRootPath}`}
+						submitLabel={({ relativeRootPath }) => `Modify ${relativeRootPath}`}
 						codemod={codemod}
 						valid={valid}
+						onAIFallback={onAIFallback}
 					/>
 				</ModalFooterContainer>
 			</form>
@@ -113,7 +124,7 @@ const RenameCompositionLoaded: React.FC<{}> = () => {
 
 export const RenameComposition: React.FC<{
 	readonly compositionId: string;
-}> = ({compositionId}) => {
+}> = ({ compositionId }) => {
 	return (
 		<DismissableModal>
 			<ResolveCompositionBeforeModal compositionId={compositionId}>

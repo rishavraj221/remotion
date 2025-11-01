@@ -1,6 +1,6 @@
-import React, {useCallback, useContext, useMemo} from 'react';
-import {Internals} from 'remotion';
-import {BACKGROUND} from '../helpers/colors';
+import React, { useCallback, useContext, useMemo } from 'react';
+import { Internals } from 'remotion';
+import { BACKGROUND } from '../helpers/colors';
 import {
 	createFolderTree,
 	splitParentIntoNameAndParent,
@@ -9,16 +9,18 @@ import {
 	ExpandedFoldersContext,
 	openFolderKey,
 } from '../helpers/persist-open-folders';
-import {useZIndex} from '../state/z-index';
-import {CompositionSelectorItem} from './CompositionSelectorItem';
+import { useZIndex } from '../state/z-index';
+import { CompositionSelectorItem } from './CompositionSelectorItem';
 import {
 	CURRENT_COMPOSITION_HEIGHT,
 	CurrentComposition,
 } from './CurrentComposition';
-import {useSelectComposition} from './InitialCompositionLoader';
+import { useSelectComposition } from './InitialCompositionLoader';
+import { ModalsContext } from '../state/modals';
+import { BLUE } from '../helpers/colors';
 
 export const useCompositionNavigation = () => {
-	const {compositions, canvasContent} = useContext(
+	const { compositions, canvasContent } = useContext(
 		Internals.CompositionManager,
 	);
 	const selectComposition = useSelectComposition();
@@ -95,7 +97,7 @@ export const getKeysToExpand = (
 		}),
 	);
 
-	const {name, parent} = splitParentIntoNameAndParent(parentFolderName);
+	const { name, parent } = splitParentIntoNameAndParent(parentFolderName);
 	if (!name) {
 		return initial;
 	}
@@ -104,12 +106,12 @@ export const getKeysToExpand = (
 };
 
 export const CompositionSelector: React.FC = () => {
-	const {compositions, canvasContent, folders} = useContext(
+	const { compositions, canvasContent, folders } = useContext(
 		Internals.CompositionManager,
 	);
-	const {foldersExpanded} = useContext(ExpandedFoldersContext);
+	const { foldersExpanded } = useContext(ExpandedFoldersContext);
 
-	const {tabIndex} = useZIndex();
+	const { tabIndex } = useZIndex();
 	const selectComposition = useSelectComposition();
 
 	const items = useMemo(() => {
@@ -138,8 +140,50 @@ export const CompositionSelector: React.FC = () => {
 		[],
 	);
 
+	const { setSelectedModal } = useContext(ModalsContext);
+
+	const handleNewComposition = useCallback(() => {
+		setSelectedModal({ type: 'new-ai-composition' });
+	}, [setSelectedModal]);
+
+	const buttonContainer: React.CSSProperties = {
+		padding: '8px 12px',
+		borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+	};
+
+	const newButtonStyle: React.CSSProperties = {
+		width: '100%',
+		padding: '8px 12px',
+		backgroundColor: BLUE,
+		color: 'white',
+		border: 'none',
+		borderRadius: '4px',
+		cursor: 'pointer',
+		fontSize: 13,
+		fontFamily: 'inherit',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
+		fontWeight: 500,
+	};
+
 	return (
 		<div style={container}>
+			<div style={buttonContainer}>
+				<button
+					type="button"
+					onClick={handleNewComposition}
+					style={newButtonStyle}
+					title="Create new AI composition"
+				>
+					<span>+</span>
+					<span>New Composition</span>
+				</button>
+			</div>
 			{showCurrentComposition ? <CurrentComposition /> : null}
 			<div className="__remotion-vertical-scrollbar" style={list}>
 				{items.map((c) => {

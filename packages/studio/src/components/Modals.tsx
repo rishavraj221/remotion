@@ -1,21 +1,22 @@
-import React, {useContext} from 'react';
-import {StudioServerConnectionCtx} from '../helpers/client-id';
-import {ModalsContext} from '../state/modals';
-import {AskAiModal} from './AskAiModal';
-import {InstallPackageModal} from './InstallPackage';
-import {DeleteComposition} from './NewComposition/DeleteComposition';
-import {DuplicateComposition} from './NewComposition/DuplicateComposition';
-import {RenameComposition} from './NewComposition/RenameComposition';
-import {OverrideInputPropsModal} from './OverrideInputProps';
+import React, { useContext } from 'react';
+import { StudioServerConnectionCtx } from '../helpers/client-id';
+import { ModalsContext } from '../state/modals';
+import { AskAiModal } from './AskAiModal';
+import { InstallPackageModal } from './InstallPackage';
+import { DeleteComposition } from './NewComposition/DeleteComposition';
+import { DuplicateComposition } from './NewComposition/DuplicateComposition';
+import { RenameComposition } from './NewComposition/RenameComposition';
+import { OverrideInputPropsModal } from './OverrideInputProps';
 import QuickSwitcher from './QuickSwitcher/QuickSwitcher';
-import {RenderModalWithLoader} from './RenderModal/RenderModal';
-import {RenderStatusModal} from './RenderModal/RenderStatusModal';
-import {UpdateModal} from './UpdateModal/UpdateModal';
+import { RenderModalWithLoader } from './RenderModal/RenderModal';
+import { RenderStatusModal } from './RenderModal/RenderStatusModal';
+import { UpdateModal } from './UpdateModal/UpdateModal';
+import { NewAIComposition } from './NewAIComposition/NewAIComposition';
 
 export const Modals: React.FC<{
 	readonly readOnlyStudio: boolean;
-}> = ({readOnlyStudio}) => {
-	const {selectedModal: modalContextType} = useContext(ModalsContext);
+}> = ({ readOnlyStudio }) => {
+	const { selectedModal: modalContextType } = useContext(ModalsContext);
 	const canRender =
 		useContext(StudioServerConnectionCtx).previewServerState.type ===
 		'connected';
@@ -36,6 +37,9 @@ export const Modals: React.FC<{
 			)}
 			{modalContextType && modalContextType.type === 'input-props-override' && (
 				<OverrideInputPropsModal />
+			)}
+			{modalContextType && modalContextType.type === 'new-ai-composition' && (
+				<NewAIComposition />
 			)}
 
 			{modalContextType && canRender && modalContextType.type === 'render' && (
