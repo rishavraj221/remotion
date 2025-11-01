@@ -4,6 +4,7 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { CompositionManager } from './composition-manager';
 import { generateCompositionLoader } from './composition-loader-generator';
 import { validateCode, formatErrorsForLLM } from './code-validator';
+import { AssetManager } from './asset-manager';
 
 export type AIWebSocketMessage = 
   | {type: 'chat'; message: string; compositionId?: string}
@@ -16,6 +17,11 @@ export type AIWebSocketMessage =
   | {type: 'code-generation'; code: string; prompt: string; projectName?: string; compositionId?: string}
   | {type: 'code-edit'; compositionId: string; code: string; prompt: string; width?: number; height?: number; fps?: number; durationInFrames?: number}
   | {type: 'get-compositions'}
+  | {type: 'upload-asset'; file: string; filename: string; mimeType: string; tags?: string[]; compositionId?: string; description?: string}
+  | {type: 'get-assets'; compositionId?: string; tags?: string[]}
+  | {type: 'tag-asset'; assetId: string; tags: string[]}
+  | {type: 'delete-asset'; assetId: string}
+  | {type: 'delete-asset-by-path'; filePath: string}
   | {type: 'status'; status: string};
 
 const AI_BACKEND_WS_URL = 'ws://localhost:8000';
@@ -25,6 +31,7 @@ let aiBackendConnection: WebSocket | null = null;
 // Initialize composition manager
 const projectRoot = path.resolve(__dirname, '../../example/src/ai-projects');
 const compositionManager = new CompositionManager(projectRoot);
+const assetManager = new AssetManager(projectRoot);
 
 // Store selected composition ID per WebSocket connection
 const connectionState = new Map<WebSocket, { selectedCompositionId?: string }>();
@@ -282,7 +289,11 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
 
         if (message.type === 'delete-composition') {
           try {
-            const success = compositionManager.deleteComposition(message.compositionId);
+            // Delete assets and composition
+            const success = compositionManager.deleteComposition(
+              message.compositionId,
+              (compositionId) => assetManager.deleteAssetsByComposition(compositionId)
+            );
             if (success) {
               // Regenerate composition loader
               generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
@@ -356,6 +367,9 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
               height: message.height,
               fps: message.fps,
               durationInFrames: message.durationInFrames,
+              duplicateAssets: (sourceId, targetId) => {
+                assetManager.duplicateAssets(sourceId, targetId);
+              },
             });
             if (composition) {
               // Regenerate composition loader
@@ -397,6 +411,137 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
           return;
         }
 
+        if (message.type === 'upload-asset') {
+          (async () => {
+            try {
+              const state = connectionState.get(ws);
+              const compositionId = message.compositionId || state?.selectedCompositionId;
+              
+              // Convert base64 string to buffer
+              const buffer = Buffer.from(message.file, 'base64');
+              
+              const asset = await assetManager.uploadAsset(
+                buffer,
+                message.filename,
+                message.mimeType,
+                {
+                  tags: message.tags || [],
+                  compositionId,
+                  description: message.description,
+                }
+              );
+
+              ws.send(JSON.stringify({
+                type: 'asset-uploaded',
+                asset,
+                success: true,
+              }));
+            } catch (error) {
+              ws.send(JSON.stringify({
+                type: 'error',
+                content: `Failed to upload asset: ${(error as Error).message}`,
+              }));
+            }
+          })();
+          return;
+        }
+
+        if (message.type === 'get-assets') {
+          try {
+            let assets;
+            if (message.compositionId) {
+              assets = assetManager.getAssetsByComposition(message.compositionId);
+            } else if (message.tags && message.tags.length > 0) {
+              assets = assetManager.getAssetsByTags(message.tags);
+            } else {
+              assets = assetManager.getAllAssets();
+            }
+
+            ws.send(JSON.stringify({
+              type: 'assets-list',
+              assets,
+            }));
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `Failed to get assets: ${(error as Error).message}`,
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'tag-asset') {
+          try {
+            const asset = assetManager.updateAssetTags(message.assetId, message.tags);
+            if (asset) {
+              ws.send(JSON.stringify({
+                type: 'asset-tagged',
+                asset,
+                success: true,
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'error',
+                content: 'Asset not found',
+              }));
+            }
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `Failed to tag asset: ${(error as Error).message}`,
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'delete-asset') {
+          try {
+            const success = assetManager.deleteAsset(message.assetId);
+            if (success) {
+              ws.send(JSON.stringify({
+                type: 'asset-deleted',
+                assetId: message.assetId,
+                success: true,
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'error',
+                content: 'Asset not found',
+              }));
+            }
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `Failed to delete asset: ${(error as Error).message}`,
+            }));
+          }
+          return;
+        }
+
+        if (message.type === 'delete-asset-by-path') {
+          try {
+            const success = assetManager.deleteAssetByFilePath(message.filePath);
+            if (success) {
+              ws.send(JSON.stringify({
+                type: 'asset-deleted',
+                filePath: message.filePath,
+                success: true,
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'error',
+                content: 'Asset not found',
+              }));
+            }
+          } catch (error) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: `Failed to delete asset: ${(error as Error).message}`,
+            }));
+          }
+          return;
+        }
+
         // Forward chat messages to AI backend with composition context
         if (message.type === 'chat') {
           const state = connectionState.get(ws);
@@ -415,11 +560,23 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
               existingCode = code || undefined;
             }
             
-            // Include composition ID and existing code in message to backend
+            // Get assets for this composition
+            const assets = compositionId ? assetManager.getAssetsByComposition(compositionId) : [];
+            
+            // Include composition ID, existing code, and available assets in message to backend
             aiBackendConnection.send(JSON.stringify({
               ...message,
               compositionId,
               existingCode,
+              availableAssets: assets.map(a => ({
+                id: a.id,
+                filename: a.filename,
+                originalFilename: a.originalFilename,
+                filePath: a.filePath,
+                mimeType: a.mimeType,
+                tags: a.tags,
+                description: a.description,
+              })),
             }));
           } else {
             console.error('AI backend not connected');

@@ -185,7 +185,7 @@ export class CompositionManager {
 		return composition?.chatHistory || [];
 	}
 
-	deleteComposition(id: string): boolean {
+	deleteComposition(id: string, deleteAssets?: (compositionId: string) => void): boolean {
 		const metadata = this.loadMetadata();
 		const index = metadata.findIndex((c) => c.id === id);
 		
@@ -203,6 +203,11 @@ export class CompositionManager {
 			}
 		} catch (error) {
 			console.error('Error deleting composition file:', error);
+		}
+
+		// Delete associated assets if callback provided
+		if (deleteAssets) {
+			deleteAssets(id);
 		}
 
 		// Remove from metadata
@@ -279,6 +284,7 @@ export class CompositionManager {
 		height?: number;
 		fps?: number;
 		durationInFrames?: number;
+		duplicateAssets?: (sourceCompositionId: string, targetCompositionId: string) => void;
 	}): CompositionMetadata | null {
 		const metadata = this.loadMetadata();
 		const original = metadata.find((c) => c.id === id);
@@ -332,6 +338,11 @@ export class CompositionManager {
 
 		metadata.push(newComposition);
 		this.saveMetadata(metadata);
+
+		// Duplicate associated assets if callback provided
+		if (options?.duplicateAssets) {
+			options.duplicateAssets(id, newId);
+		}
 
 		return newComposition;
 	}

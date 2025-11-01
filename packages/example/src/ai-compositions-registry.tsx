@@ -7,43 +7,12 @@
 import React from 'react';
 import { Composition } from 'remotion';
 
-// @ts-expect-error - Dynamic import
-const CompfirstcompModule = require('./ai-projects/composition-firstcomp');
-const Compfirstcomp = CompfirstcompModule.AIGeneratedComponent || CompfirstcompModule.default;
-// @ts-expect-error - Dynamic import
-const Compsecond_compModule = require('./ai-projects/composition-second-comp');
-const Compsecond_comp = Compsecond_compModule.AIGeneratedComponent || Compsecond_compModule.default;
-// @ts-expect-error - Dynamic import
-const CompthirdcompModule = require('./ai-projects/composition-thirdcomp');
-const Compthirdcomp = CompthirdcompModule.AIGeneratedComponent || CompthirdcompModule.default;
+
 
 export const AIGeneratedCompositions: React.FC = () => {
 	return (
 		<>
-			<Composition
-				id="firstcomp"
-				component={Compfirstcomp}
-				width={1920}
-				height={1080}
-				fps={30}
-				durationInFrames={150}
-			/>
-			<Composition
-				id="second-comp"
-				component={Compsecond_comp}
-				width={1920}
-				height={1080}
-				fps={30}
-				durationInFrames={60}
-			/>
-			<Composition
-				id="thirdcomp"
-				component={Compthirdcomp}
-				width={1920}
-				height={1080}
-				fps={30}
-				durationInFrames={150}
-			/>
+
 		</>
 	);
 };

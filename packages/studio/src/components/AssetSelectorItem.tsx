@@ -1,26 +1,28 @@
-import React, {useCallback, useContext, useMemo, useRef, useState} from 'react';
-import {Internals, type StaticFile} from 'remotion';
-import {NoReactInternals} from 'remotion/no-react';
+import React, { useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { Internals, type StaticFile } from 'remotion';
+import { NoReactInternals } from 'remotion/no-react';
 import {
 	BACKGROUND,
 	CLEAR_HOVER,
 	LIGHT_TEXT,
 	SELECTED_BACKGROUND,
 } from '../helpers/colors';
-import {copyText} from '../helpers/copy-text';
-import type {AssetFolder, AssetStructure} from '../helpers/create-folder-tree';
-import {useMobileLayout} from '../helpers/mobile-layout';
-import {pushUrl} from '../helpers/url-state';
+import { copyText } from '../helpers/copy-text';
+import type { AssetFolder, AssetStructure } from '../helpers/create-folder-tree';
+import { useMobileLayout } from '../helpers/mobile-layout';
+import { pushUrl } from '../helpers/url-state';
 import useAssetDragEvents from '../helpers/use-asset-drag-events';
-import {ClipboardIcon} from '../icons/clipboard';
-import {FileIcon} from '../icons/file';
-import {CollapsedFolderIcon, ExpandedFolderIcon} from '../icons/folder';
-import {SidebarContext} from '../state/sidebar';
-import type {RenderInlineAction} from './InlineAction';
-import {InlineAction} from './InlineAction';
-import {showNotification} from './Notifications/NotificationCenter';
-import {openInFileExplorer} from './RenderQueue/actions';
-import {Row, Spacing} from './layout';
+import { ClipboardIcon } from '../icons/clipboard';
+import { FileIcon } from '../icons/file';
+import { CollapsedFolderIcon, ExpandedFolderIcon } from '../icons/folder';
+import { TrashIcon } from '../icons/trash';
+import { SidebarContext } from '../state/sidebar';
+import type { RenderInlineAction } from './InlineAction';
+import { InlineAction } from './InlineAction';
+import { showNotification } from './Notifications/NotificationCenter';
+import { openInFileExplorer } from './RenderQueue/actions';
+import { Row, Spacing } from './layout';
+import { deleteStaticFile } from '../api/delete-static-file';
 
 const ASSET_ITEM_HEIGHT = 32;
 
@@ -85,96 +87,96 @@ const AssetFolderItem: React.FC<{
 	dropLocation,
 	setDropLocation,
 }) => {
-	const [hovered, setHovered] = useState(false);
-	const openFolderTimerRef = useRef<number | null>(null);
+		const [hovered, setHovered] = useState(false);
+		const openFolderTimerRef = useRef<number | null>(null);
 
-	const {isDropDiv, onDragEnter, onDragLeave} = useAssetDragEvents({
-		name: item.name,
-		parentFolder,
-		dropLocation,
-		setDropLocation,
-	});
+		const { isDropDiv, onDragEnter, onDragLeave } = useAssetDragEvents({
+			name: item.name,
+			parentFolder,
+			dropLocation,
+			setDropLocation,
+		});
 
-	const onPointerEnter = useCallback(() => {
-		setHovered(true);
-	}, []);
+		const onPointerEnter = useCallback(() => {
+			setHovered(true);
+		}, []);
 
-	const onPointerLeave = useCallback(() => {
-		setHovered(false);
-	}, []);
+		const onPointerLeave = useCallback(() => {
+			setHovered(false);
+		}, []);
 
-	const folderStyle: React.CSSProperties = useMemo(() => {
-		return {
-			...itemStyle,
-			paddingLeft: 4 + level * 8,
-			backgroundColor: hovered ? CLEAR_HOVER : 'transparent',
-		};
-	}, [hovered, level]);
+		const folderStyle: React.CSSProperties = useMemo(() => {
+			return {
+				...itemStyle,
+				paddingLeft: 4 + level * 8,
+				backgroundColor: hovered ? CLEAR_HOVER : 'transparent',
+			};
+		}, [hovered, level]);
 
-	const label = useMemo(() => {
-		return {
-			...labelStyle,
-			color: hovered ? 'white' : LIGHT_TEXT,
-		};
-	}, [hovered]);
+		const label = useMemo(() => {
+			return {
+				...labelStyle,
+				color: hovered ? 'white' : LIGHT_TEXT,
+			};
+		}, [hovered]);
 
-	const onClick = useCallback(() => {
-		toggleFolder(item.name, parentFolder);
-	}, [item.name, parentFolder, toggleFolder]);
+		const onClick = useCallback(() => {
+			toggleFolder(item.name, parentFolder);
+		}, [item.name, parentFolder, toggleFolder]);
 
-	const Icon = item.expanded ? ExpandedFolderIcon : CollapsedFolderIcon;
+		const Icon = item.expanded ? ExpandedFolderIcon : CollapsedFolderIcon;
 
-	return (
-		<div
-			onDragEnter={onDragEnter}
-			onDragLeave={onDragLeave}
-			style={{
-				backgroundColor: isDropDiv ? CLEAR_HOVER : BACKGROUND,
-			}}
-		>
+		return (
 			<div
-				style={folderStyle}
-				onPointerEnter={onPointerEnter}
-				onPointerLeave={onPointerLeave}
-				tabIndex={tabIndex}
-				title={item.name}
-				onClick={onClick}
-				onDragEnter={() => {
-					if (!item.expanded) {
-						openFolderTimerRef.current = window.setTimeout(() => {
-							toggleFolder(item.name, parentFolder);
-						}, 1000);
-					}
-				}}
-				onDragLeave={() => {
-					if (openFolderTimerRef.current) {
-						clearTimeout(openFolderTimerRef.current);
-					}
+				onDragEnter={onDragEnter}
+				onDragLeave={onDragLeave}
+				style={{
+					backgroundColor: isDropDiv ? CLEAR_HOVER : BACKGROUND,
 				}}
 			>
-				<Row>
-					<Icon style={iconStyle} color={hovered ? 'white' : LIGHT_TEXT} />
-					<Spacing x={1} />
-					<div style={label}>{item.name}</div>
-				</Row>
-			</div>
-
-			{item.expanded ? (
-				<AssetFolderTree
-					key={item.name}
-					item={item.items}
-					name={item.name}
-					level={level}
-					parentFolder={parentFolder}
+				<div
+					style={folderStyle}
+					onPointerEnter={onPointerEnter}
+					onPointerLeave={onPointerLeave}
 					tabIndex={tabIndex}
-					toggleFolder={toggleFolder}
-					dropLocation={dropLocation}
-					setDropLocation={setDropLocation}
-				/>
-			) : null}
-		</div>
-	);
-};
+					title={item.name}
+					onClick={onClick}
+					onDragEnter={() => {
+						if (!item.expanded) {
+							openFolderTimerRef.current = window.setTimeout(() => {
+								toggleFolder(item.name, parentFolder);
+							}, 1000);
+						}
+					}}
+					onDragLeave={() => {
+						if (openFolderTimerRef.current) {
+							clearTimeout(openFolderTimerRef.current);
+						}
+					}}
+				>
+					<Row>
+						<Icon style={iconStyle} color={hovered ? 'white' : LIGHT_TEXT} />
+						<Spacing x={1} />
+						<div style={label}>{item.name}</div>
+					</Row>
+				</div>
+
+				{item.expanded ? (
+					<AssetFolderTree
+						key={item.name}
+						item={item.items}
+						name={item.name}
+						level={level}
+						parentFolder={parentFolder}
+						tabIndex={tabIndex}
+						toggleFolder={toggleFolder}
+						dropLocation={dropLocation}
+						setDropLocation={setDropLocation}
+					/>
+				) : null}
+			</div>
+		);
+	};
 
 export const AssetFolderTree: React.FC<{
 	readonly item: AssetStructure;
@@ -198,55 +200,55 @@ export const AssetFolderTree: React.FC<{
 	dropLocation,
 	setDropLocation,
 }) => {
-	const combinedParents = useMemo(() => {
-		return [parentFolder, name].filter(NoReactInternals.truthy).join('/');
-	}, [name, parentFolder]);
-	return (
-		<div>
-			{item.folders.map((folder) => {
-				return (
-					<AssetFolderItem
-						key={folder.name}
-						item={folder}
-						tabIndex={tabIndex}
-						level={level + 1}
-						parentFolder={combinedParents}
-						toggleFolder={toggleFolder}
-						dropLocation={dropLocation}
-						setDropLocation={setDropLocation}
-					/>
-				);
-			})}
-			{item.files.map((file) => {
-				return (
-					<AssetSelectorItem
-						key={file.src}
-						item={file}
-						tabIndex={tabIndex}
-						level={level}
-						parentFolder={combinedParents}
-					/>
-				);
-			})}
-		</div>
-	);
-};
+		const combinedParents = useMemo(() => {
+			return [parentFolder, name].filter(NoReactInternals.truthy).join('/');
+		}, [name, parentFolder]);
+		return (
+			<div>
+				{item.folders.map((folder) => {
+					return (
+						<AssetFolderItem
+							key={folder.name}
+							item={folder}
+							tabIndex={tabIndex}
+							level={level + 1}
+							parentFolder={combinedParents}
+							toggleFolder={toggleFolder}
+							dropLocation={dropLocation}
+							setDropLocation={setDropLocation}
+						/>
+					);
+				})}
+				{item.files.map((file) => {
+					return (
+						<AssetSelectorItem
+							key={file.src}
+							item={file}
+							tabIndex={tabIndex}
+							level={level}
+							parentFolder={combinedParents}
+						/>
+					);
+				})}
+			</div>
+		);
+	};
 
 const AssetSelectorItem: React.FC<{
 	readonly item: StaticFile | AssetFolder;
 	readonly tabIndex: number;
 	readonly level: number;
 	readonly parentFolder: string;
-}> = ({item, tabIndex, level, parentFolder}) => {
+}> = ({ item, tabIndex, level, parentFolder }) => {
 	const isMobileLayout = useMobileLayout();
 	const [hovered, setHovered] = useState(false);
-	const {setSidebarCollapsedState} = useContext(SidebarContext);
+	const { setSidebarCollapsedState } = useContext(SidebarContext);
 	const onPointerEnter = useCallback(() => {
 		setHovered(true);
 	}, []);
 
-	const {setCanvasContent} = useContext(Internals.CompositionSetters);
-	const {canvasContent} = useContext(Internals.CompositionManager);
+	const { setCanvasContent } = useContext(Internals.CompositionSetters);
+	const { canvasContent } = useContext(Internals.CompositionManager);
 
 	const selected = useMemo(() => {
 		if (canvasContent && canvasContent.type === 'asset') {
@@ -266,10 +268,10 @@ const AssetSelectorItem: React.FC<{
 		const relativePath = parentFolder
 			? parentFolder + '/' + item.name
 			: item.name;
-		setCanvasContent({type: 'asset', asset: relativePath});
+		setCanvasContent({ type: 'asset', asset: relativePath });
 		pushUrl(`/assets/${relativePath}`);
 		if (isMobileLayout) {
-			setSidebarCollapsedState({left: 'collapsed', right: 'collapsed'});
+			setSidebarCollapsedState({ left: 'collapsed', right: 'collapsed' });
 		}
 	}, [
 		isMobileLayout,
@@ -309,6 +311,10 @@ const AssetSelectorItem: React.FC<{
 		return <ClipboardIcon style={revealIconStyle} color={color} />;
 	}, []);
 
+	const renderDeleteAction: RenderInlineAction = useCallback((color) => {
+		return <TrashIcon style={revealIconStyle} color={color} />;
+	}, []);
+
 	const revealInExplorer: React.MouseEventHandler<HTMLButtonElement> =
 		React.useCallback(
 			(e) => {
@@ -343,6 +349,63 @@ const AssetSelectorItem: React.FC<{
 			[item.name, parentFolder],
 		);
 
+	const deleteAsset: React.MouseEventHandler<HTMLButtonElement> =
+		useCallback(
+			(e) => {
+				e.stopPropagation();
+				const relativePath = parentFolder
+					? parentFolder + '/' + item.name
+					: item.name;
+
+				// Check if this is an AI composition asset (in ai-projects-assets folder)
+				const isAIAsset = relativePath.startsWith('ai-projects-assets/');
+
+				if (isAIAsset) {
+					// Delete via AI WebSocket
+					const ws = new WebSocket('ws://localhost:3000/ai-ws');
+					ws.onopen = () => {
+						ws.send(JSON.stringify({
+							type: 'delete-asset-by-path',
+							filePath: relativePath,
+						}));
+					};
+
+					ws.onmessage = (event) => {
+						try {
+							const data = JSON.parse(event.data.toString());
+							if (data.type === 'asset-deleted') {
+								showNotification(`Deleted ${item.name}`, 1000);
+								ws.close();
+								// Trigger refresh by dispatching new-public-folder event (same as AssetSelector listens to)
+								window.dispatchEvent(new CustomEvent('new-public-folder'));
+							} else if (data.type === 'error') {
+								showNotification(`Could not delete: ${data.content}`, 2000);
+								ws.close();
+							}
+						} catch (err) {
+							showNotification(`Could not delete: ${err instanceof Error ? err.message : 'Unknown error'}`, 2000);
+							ws.close();
+						}
+					};
+
+					ws.onerror = () => {
+						showNotification('Failed to connect to delete asset', 2000);
+						ws.close();
+					};
+				} else {
+					// Delete via regular API
+					deleteStaticFile(relativePath)
+						.then(() => {
+							showNotification(`Deleted ${item.name}`, 1000);
+						})
+						.catch((err: Error) => {
+							showNotification(`Could not delete: ${err.message}`, 2000);
+						});
+				}
+			},
+			[item.name, parentFolder],
+		);
+
 	return (
 		<Row align="center">
 			<div
@@ -369,6 +432,12 @@ const AssetSelectorItem: React.FC<{
 							title="Open in Explorer"
 							renderAction={renderFileExplorerAction}
 							onClick={revealInExplorer}
+						/>
+						<Spacing x={0.5} />
+						<InlineAction
+							title="Delete"
+							renderAction={renderDeleteAction}
+							onClick={deleteAsset}
 						/>
 					</>
 				) : null}

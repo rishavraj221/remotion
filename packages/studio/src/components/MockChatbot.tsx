@@ -379,6 +379,18 @@ export const MockChatbot: React.FC = () => {
 					ws.send(JSON.stringify({ type: 'select-composition', compositionId: data.composition.id }));
 				}
 
+				if (data.type === 'asset-uploaded') {
+					setMessages((prev) => [
+						...prev,
+						{
+							text: `✅ Asset uploaded successfully: **${data.asset.originalFilename}**\n\nYou can now use this asset in your composition. The AI will automatically reference it when generating code.`,
+							sender: 'bot',
+							timestamp: new Date(),
+						},
+					]);
+					return;
+				}
+
 				// Handle code-generated/updated messages specially
 				let messageContent = data.content || JSON.stringify(data);
 				if (data.type === 'code-generated' || data.type === 'code-updated') {
@@ -489,6 +501,86 @@ export const MockChatbot: React.FC = () => {
 		[handleSend],
 	);
 
+	const handleFileUpload = useCallback(
+		async (e: React.ChangeEvent<HTMLInputElement>) => {
+			const files = e.target.files;
+			if (!files || files.length === 0 || !wsRef.current || !selectedCompositionId) return;
+
+			for (const file of Array.from(files)) {
+				// Check file size (limit to 10MB)
+				if (file.size > 10 * 1024 * 1024) {
+					setMessages((prev) => [
+						...prev,
+						{
+							text: `⚠️ File ${file.name} is too large. Maximum size is 10MB.`,
+							sender: 'status',
+							timestamp: new Date(),
+						},
+					]);
+					continue;
+				}
+
+				try {
+					// Show uploading message
+					setMessages((prev) => [
+						...prev,
+						{
+							text: `📤 Uploading ${file.name}...`,
+							sender: 'status',
+							timestamp: new Date(),
+						},
+					]);
+
+					// Convert file to base64
+					const reader = new FileReader();
+					reader.onload = async (event) => {
+						const base64 = event.target?.result as string;
+						// Remove data URL prefix
+						const base64Data = base64.split(',')[1] || base64;
+
+						// Send upload message
+						wsRef.current?.send(JSON.stringify({
+							type: 'upload-asset',
+							file: base64Data,
+							filename: file.name,
+							mimeType: file.type || 'application/octet-stream',
+							compositionId: selectedCompositionId,
+							tags: [],
+							description: `Uploaded: ${file.name}`,
+						}));
+					};
+
+					reader.onerror = () => {
+						setMessages((prev) => [
+							...prev,
+							{
+								text: `❌ Failed to read file ${file.name}`,
+								sender: 'status',
+								timestamp: new Date(),
+							},
+						]);
+					};
+
+					reader.readAsDataURL(file);
+				} catch (error) {
+					setMessages((prev) => [
+						...prev,
+						{
+							text: `❌ Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+							sender: 'status',
+							timestamp: new Date(),
+						},
+					]);
+				}
+			}
+
+			// Reset file input
+			e.target.value = '';
+		},
+		[selectedCompositionId],
+	);
+
+
 	return (
 		<div style={container} className="css-reset">
 			<style>{markdownStyles}</style>
@@ -547,6 +639,30 @@ export const MockChatbot: React.FC = () => {
 				<div ref={messagesEndRef} />
 			</div>
 			<div style={inputContainer}>
+				{selectedCompositionId && (
+					<label
+						style={{
+							...buttonStyle,
+							opacity: connected ? 1 : 0.5,
+							cursor: connected ? 'pointer' : 'not-allowed',
+							marginRight: '8px',
+							display: 'inline-flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							padding: '10px 14px',
+						}}
+					>
+						📎 Upload
+						<input
+							type="file"
+							multiple
+							onChange={handleFileUpload}
+							style={{ display: 'none' }}
+							disabled={!connected}
+							accept="image/*,audio/*,video/*"
+						/>
+					</label>
+				)}
 				<input
 					type="text"
 					value={input}

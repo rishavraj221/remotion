@@ -3,21 +3,23 @@ import React, {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from 'react';
-import {getStaticFiles, type StaticFile} from '../api/get-static-files';
-import {writeStaticFile} from '../api/write-static-file';
-import {StudioServerConnectionCtx} from '../helpers/client-id';
-import {BACKGROUND, CLEAR_HOVER, LIGHT_TEXT} from '../helpers/colors';
-import {buildAssetFolderStructure} from '../helpers/create-folder-tree';
-import type {ExpandedFoldersState} from '../helpers/persist-open-folders';
-import {persistExpandedFolders} from '../helpers/persist-open-folders';
+import { getStaticFiles, type StaticFile } from '../api/get-static-files';
+import { writeStaticFile } from '../api/write-static-file';
+import { StudioServerConnectionCtx } from '../helpers/client-id';
+import { BACKGROUND, CLEAR_HOVER, LIGHT_TEXT } from '../helpers/colors';
+import { buildAssetFolderStructure } from '../helpers/create-folder-tree';
+import type { ExpandedFoldersState } from '../helpers/persist-open-folders';
+import { persistExpandedFolders } from '../helpers/persist-open-folders';
 import useAssetDragEvents from '../helpers/use-asset-drag-events';
-import {FolderContext} from '../state/folders';
-import {useZIndex} from '../state/z-index';
-import {AssetFolderTree} from './AssetSelectorItem';
-import {inlineCodeSnippet} from './Menu/styles';
-import {showNotification} from './Notifications/NotificationCenter';
+import { FolderContext } from '../state/folders';
+import { useZIndex } from '../state/z-index';
+import { AssetFolderTree } from './AssetSelectorItem';
+import { inlineCodeSnippet } from './Menu/styles';
+import { showNotification } from './Notifications/NotificationCenter';
+import { Plus } from '../icons/plus';
 
 const container: React.CSSProperties = {
 	display: 'flex',
@@ -48,6 +50,33 @@ const list: React.CSSProperties = {
 	overflowY: 'auto',
 };
 
+const uploadButton: React.CSSProperties = {
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	padding: '8px 12px',
+	margin: '8px',
+	backgroundColor: 'transparent',
+	border: `1px dashed ${LIGHT_TEXT}`,
+	borderRadius: '4px',
+	color: LIGHT_TEXT,
+	cursor: 'pointer',
+	fontSize: '13px',
+	transition: 'all 0.2s ease',
+	gap: '6px',
+};
+
+const uploadButtonHover: React.CSSProperties = {
+	...uploadButton,
+	backgroundColor: CLEAR_HOVER,
+	borderColor: 'white',
+	color: 'white',
+};
+
+const hiddenFileInput: React.CSSProperties = {
+	display: 'none',
+};
+
 type State = {
 	staticFiles: StaticFile[];
 	publicFolderExists: string | null;
@@ -55,17 +84,19 @@ type State = {
 
 export const AssetSelector: React.FC<{
 	readonly readOnlyStudio: boolean;
-}> = ({readOnlyStudio}) => {
-	const {tabIndex} = useZIndex();
-	const {assetFoldersExpanded, setAssetFoldersExpanded} =
+}> = ({ readOnlyStudio }) => {
+	const { tabIndex } = useZIndex();
+	const { assetFoldersExpanded, setAssetFoldersExpanded } =
 		useContext(FolderContext);
 	const [dropLocation, setDropLocation] = useState<string | null>(null);
-	const {subscribeToEvent} = useContext(StudioServerConnectionCtx);
+	const [uploadButtonHovered, setUploadButtonHovered] = useState(false);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const { subscribeToEvent } = useContext(StudioServerConnectionCtx);
 	const connectionStatus = useContext(StudioServerConnectionCtx)
 		.previewServerState.type;
 	const shouldAllowUpload = connectionStatus === 'connected' && !readOnlyStudio;
 
-	const [{publicFolderExists, staticFiles}, setState] = React.useState<State>(
+	const [{ publicFolderExists, staticFiles }, setState] = React.useState<State>(
 		() => {
 			return {
 				staticFiles: getStaticFiles(),
@@ -109,7 +140,7 @@ export const AssetSelector: React.FC<{
 		[setAssetFoldersExpanded],
 	);
 
-	const {isDropDiv, onDragEnter, onDragLeave} = useAssetDragEvents({
+	const { isDropDiv, onDragEnter, onDragLeave } = useAssetDragEvents({
 		name: null,
 		parentFolder: null,
 		dropLocation,
@@ -127,7 +158,7 @@ export const AssetSelector: React.FC<{
 			try {
 				e.preventDefault();
 				e.stopPropagation();
-				const {files} = e.dataTransfer;
+				const { files } = e.dataTransfer;
 				const assetPath = dropLocation ?? null;
 
 				const makePath = (file: File) => {
@@ -156,12 +187,69 @@ export const AssetSelector: React.FC<{
 		[dropLocation],
 	);
 
+	const handleFileUpload = useCallback(
+		async (event: React.ChangeEvent<HTMLInputElement>) => {
+			const files = event.target.files;
+			if (!files || files.length === 0) return;
+
+			try {
+				for (const file of files) {
+					const body = await file.arrayBuffer();
+					await writeStaticFile({
+						contents: body,
+						filePath: file.name,
+					});
+				}
+
+				if (files.length === 1) {
+					showNotification(`Uploaded ${files[0].name}`, 3000);
+				} else {
+					showNotification(`Uploaded ${files.length} files`, 3000);
+				}
+
+				// Clear the input so the same file can be uploaded again
+				if (event.target) {
+					event.target.value = '';
+				}
+			} catch (error) {
+				showNotification(`Error during upload: ${error}`, 3000);
+			}
+		},
+		[],
+	);
+
+	const handleUploadClick = useCallback(() => {
+		fileInputRef.current?.click();
+	}, []);
+
 	return (
 		<div
 			style={container}
 			onDragOver={shouldAllowUpload ? onDragOver : undefined}
 			onDrop={shouldAllowUpload ? onDrop : undefined}
 		>
+			{shouldAllowUpload && (
+				<>
+					<input
+						ref={fileInputRef}
+						type="file"
+						multiple
+						onChange={handleFileUpload}
+						style={hiddenFileInput}
+						accept="image/*,video/*,audio/*,.pdf,.txt,.json,.csv,.xml"
+					/>
+					<button
+						style={uploadButtonHovered ? uploadButtonHover : uploadButton}
+						onClick={handleUploadClick}
+						onMouseEnter={() => setUploadButtonHovered(true)}
+						onMouseLeave={() => setUploadButtonHovered(false)}
+						title="Upload files"
+					>
+						<Plus style={{ width: 14, height: 14 }} color="currentColor" />
+						Upload Assets
+					</button>
+				</>
+			)}
 			{staticFiles.length === 0 ? (
 				publicFolderExists ? (
 					<div style={emptyState}>
