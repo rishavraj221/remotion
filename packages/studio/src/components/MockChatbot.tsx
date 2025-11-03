@@ -272,13 +272,12 @@ export const MockChatbot: React.FC = () => {
 	// Get currently selected composition from Remotion
 	const { canvasContent } = useContext(Internals.CompositionManager);
 
-	// Auto-select AI composition when it's selected in the sidebar
+	// Auto-select composition when it's selected in the sidebar
 	useEffect(() => {
 		if (canvasContent && canvasContent.type === 'composition') {
 			const compositionId = canvasContent.compositionId;
-			// Check if this composition exists in our AI compositions list
-			const isAIComposition = compositions.some(c => c.id === compositionId);
-			if (isAIComposition && compositionId !== selectedCompositionId) {
+			// Always sync with sidebar selection
+			if (compositionId !== selectedCompositionId) {
 				setSelectedCompositionId(compositionId);
 				// Send select message to backend to load chat history
 				if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -289,7 +288,7 @@ export const MockChatbot: React.FC = () => {
 				}
 			}
 		}
-	}, [canvasContent, compositions, selectedCompositionId]);
+	}, [canvasContent, selectedCompositionId]);
 
 	useEffect(() => {
 		const ws = new WebSocket('ws://localhost:3000/ai-ws');
@@ -333,20 +332,84 @@ export const MockChatbot: React.FC = () => {
 				setIsLoading(false); // Stop loading indicator
 
 				// Handle different message types
+				if (data.type === 'workflow-progress') {
+					// Handle workflow progress updates
+					const agentIcons = ['🎬', '🎨', '📝', '💻'];
+					const icon = agentIcons[data.agentNumber - 1] || '🤖';
+					
+					let progressText = '';
+					if (data.status === 'start') {
+						progressText = `${icon} **${data.agentName}** - Starting...`;
+					} else if (data.status === 'complete') {
+						progressText = `${icon} **${data.agentName}** - Complete ✅`;
+					} else if (data.status === 'clarification') {
+						progressText = `${icon} **${data.agentName}** - Needs clarification`;
+					}
+					
+					if (data.details) {
+						progressText += `\n${data.details}`;
+					}
+					
+					if (data.progress !== undefined) {
+						progressText += `\n_Progress: ${Math.round(data.progress)}%_`;
+					}
+					
+					setMessages((prev) => [
+						...prev,
+						{
+							text: progressText,
+							sender: 'status',
+							timestamp: new Date(),
+						},
+					]);
+					return;
+				}
+
+				if (data.type === 'clarification-needed') {
+					// Handle clarification request
+					setIsLoading(false);
+					
+					let clarificationText = `**${data.explanation || 'I need more information to proceed'}**\n\n`;
+					
+					if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+						clarificationText += '**Please provide:**\n\n';
+						data.questions.forEach((q: string | { question: string; suggestions?: string[] }, index: number) => {
+							if (typeof q === 'string') {
+								clarificationText += `${index + 1}. ${q}\n`;
+							} else {
+								clarificationText += `${index + 1}. ${q.question}\n`;
+								if (q.suggestions && q.suggestions.length > 0) {
+									clarificationText += `   _Suggestions: ${q.suggestions.join(', ')}_\n`;
+								}
+							}
+						});
+					}
+					
+					clarificationText += '\n_Reply to this message with your answers._';
+					
+					setMessages((prev) => [
+						...prev,
+						{
+							text: clarificationText,
+							sender: 'bot',
+							timestamp: new Date(),
+						},
+					]);
+					return;
+				}
+
 				if (data.type === 'compositions-list') {
 					setCompositions(data.compositions || []);
-					if (data.compositions && data.compositions.length > 0 && !selectedCompositionId) {
-						// Auto-select first composition
-						setSelectedCompositionId(data.compositions[0].id);
-						ws.send(JSON.stringify({ type: 'select-composition', compositionId: data.compositions[0].id }));
-					}
+					// Don't auto-select - let user select from sidebar
 					return;
 				}
 
 				if (data.type === 'composition-selected') {
+					// Update selected composition ID first
 					setSelectedCompositionId(data.composition.id);
+					
 					// Clear existing messages and load chat history for the selected composition
-					if (data.chatHistory && data.chatHistory.length > 0) {
+					if (data.chatHistory && Array.isArray(data.chatHistory) && data.chatHistory.length > 0) {
 						const historyMessages: Message[] = data.chatHistory.map((msg: { role: string; content: string; timestamp?: number }) => ({
 							text: msg.content,
 							sender: msg.role === 'user' ? 'user' : 'bot',
@@ -354,7 +417,7 @@ export const MockChatbot: React.FC = () => {
 						}));
 						setMessages([
 							{
-								text: `Switched to composition: **${data.composition.name}**`,
+								text: `📂 Switched to composition: **${data.composition.name}**`,
 								sender: 'status',
 								timestamp: new Date(),
 							},
@@ -364,7 +427,7 @@ export const MockChatbot: React.FC = () => {
 						// No chat history - start fresh for this composition
 						setMessages([
 							{
-								text: `Switched to composition: **${data.composition.name}**\n\nHello! How can I help you edit this composition?`,
+								text: `📂 **${data.composition.name}**\n\nHello! How can I help you edit this composition?`,
 								sender: 'bot',
 								timestamp: new Date(),
 							},
@@ -374,9 +437,24 @@ export const MockChatbot: React.FC = () => {
 				}
 
 				if (data.type === 'composition-created') {
-					setCompositions((prev) => [...prev, data.composition]);
+					// Add composition to list if it doesn't exist
+					setCompositions((prev) => {
+						if (prev.some(c => c.id === data.composition.id)) {
+							return prev; // Already exists
+						}
+						return [...prev, data.composition];
+					});
+					
+					// Select the new composition
 					setSelectedCompositionId(data.composition.id);
-					ws.send(JSON.stringify({ type: 'select-composition', compositionId: data.composition.id }));
+					
+					// Request to select it (which will switch chat context)
+					if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+						wsRef.current.send(JSON.stringify({ 
+							type: 'select-composition', 
+							compositionId: data.composition.id 
+						}));
+					}
 				}
 
 				if (data.type === 'asset-uploaded') {
@@ -391,30 +469,178 @@ export const MockChatbot: React.FC = () => {
 					return;
 				}
 
-				// Handle code-generated/updated messages specially
-				let messageContent = data.content || JSON.stringify(data);
-				if (data.type === 'code-generated' || data.type === 'code-updated') {
+				// Handle code-updated messages from studio-server (after code is saved)
+				if (data.type === 'code-updated') {
+					setIsLoading(false);
+					
+					if (data.success) {
+						// Code was saved successfully
+						let messageContent = `✅ **Code updated successfully!**\n\n`;
+						
+						if (data.content) {
+							messageContent += `${data.content}\n\n`;
+						}
+						
+						if (data.compositionId) {
+							const composition = data.composition || compositions.find(c => c.id === data.compositionId);
+							const compositionName = composition?.name || data.compositionId;
+							messageContent += `**Tip:** Switch to the "${compositionName}" composition in the sidebar to view your video!`;
+						}
+						
+						setMessages((prev) => [
+							...prev,
+							{
+								text: messageContent,
+								sender: 'bot',
+								timestamp: new Date(),
+							},
+						]);
+						
+						// Update compositions list if new composition was created
+						if (data.composition) {
+							setCompositions((prev) => {
+								if (prev.some(c => c.id === data.composition.id)) {
+									return prev.map(c => c.id === data.composition.id ? data.composition : c);
+								}
+								return [...prev, data.composition];
+							});
+						}
+						
+						// Select the composition if provided
+						if (data.compositionId) {
+							setSelectedCompositionId(data.compositionId);
+							if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+								wsRef.current.send(JSON.stringify({ 
+									type: 'select-composition', 
+									compositionId: data.compositionId 
+								}));
+							}
+						}
+					} else {
+						// Code update failed
+						let errorMessage = `❌ **Failed to update code**\n\n`;
+						if (data.content) {
+							errorMessage += data.content;
+						}
+						if (data.error) {
+							errorMessage += `\n\nError: ${data.error}`;
+						}
+						if (data.hasErrors && data.errors) {
+							errorMessage += `\n\nFound ${data.errors.length} error(s) in the code.`;
+						}
+						
+						setMessages((prev) => [
+							...prev,
+							{
+								text: errorMessage,
+								sender: 'bot',
+								timestamp: new Date(),
+							},
+						]);
+					}
+					return;
+				}
+
+				// Handle legacy code-generation messages (for backward compatibility, though studio-server should convert these)
+				if (data.type === 'code-generation' || data.type === 'code-edit') {
+					setIsLoading(false);
+					
+					// If this is a new composition, ensure it's selected and chat is switched
+					if (data.type === 'code-generation' && data.compositionId) {
+						// New composition created - select it and switch chat context
+						const newCompositionId = data.compositionId;
+						
+						// Check if composition is already in our list
+						if (!compositions.some(c => c.id === newCompositionId)) {
+							// Composition not in list yet - will be added by composition-created message
+							// But we can set it as selected now
+							setSelectedCompositionId(newCompositionId);
+							
+							// Request to select it (which will load chat history)
+							if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+								wsRef.current.send(JSON.stringify({ 
+									type: 'select-composition', 
+									compositionId: newCompositionId 
+								}));
+							}
+						} else {
+							// Composition already exists - just select it
+							setSelectedCompositionId(newCompositionId);
+							if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+								wsRef.current.send(JSON.stringify({ 
+									type: 'select-composition', 
+									compositionId: newCompositionId 
+								}));
+							}
+						}
+					}
+					
+					let messageContent = `✅ **Code ${data.type === 'code-generation' ? 'generated' : 'updated'} successfully!**\n\n`;
+					
+					if (data.explanation) {
+						messageContent += `${data.explanation}\n\n`;
+					}
+					
+					if (data.compositionId || data.projectName) {
+						const compositionName = data.compositionId || data.projectName;
+						messageContent += `**Tip:** Switch to the "${compositionName}" composition in the sidebar to view your video!`;
+					}
+					
+					setMessages((prev) => [
+						...prev,
+						{
+							text: messageContent,
+							sender: 'bot',
+							timestamp: new Date(),
+						},
+					]);
+					return;
+				}
+
+				if (data.type === 'response') {
+					setIsLoading(false);
+					let messageContent = data.content || JSON.stringify(data);
 					if (data.success) {
 						messageContent = `${data.content}\n\n**Tip:** Switch to the "${data.compositionId || 'composition'}" composition in the sidebar to view your video!`;
 					} else {
 						messageContent = data.content;
 					}
+					
+					const newMessage = {
+						text: messageContent,
+						sender: 'bot' as const,
+						timestamp: new Date()
+					};
+
+					console.log('🔵 [Frontend] Adding message:', newMessage);
+
+					setMessages((prev) => {
+						console.log('🔵 [Frontend] Previous messages count:', prev.length);
+						const updated = [...prev, newMessage];
+						console.log('🔵 [Frontend] New messages count:', updated.length);
+						return updated;
+					});
+					return;
 				}
 
-				const newMessage = {
-					text: messageContent,
-					sender: 'bot' as const,
-					timestamp: new Date()
-				};
+				// Fallback for any other message types not explicitly handled
+				if (data.content || data.message) {
+					const messageContent = data.content || data.message || JSON.stringify(data);
+					const newMessage = {
+						text: messageContent,
+						sender: 'bot' as const,
+						timestamp: new Date()
+					};
 
-				console.log('🔵 [Frontend] Adding message:', newMessage);
+					console.log('🔵 [Frontend] Adding fallback message:', newMessage);
 
-				setMessages((prev) => {
-					console.log('🔵 [Frontend] Previous messages count:', prev.length);
-					const updated = [...prev, newMessage];
-					console.log('🔵 [Frontend] New messages count:', updated.length);
-					return updated;
-				});
+					setMessages((prev) => {
+						console.log('🔵 [Frontend] Previous messages count:', prev.length);
+						const updated = [...prev, newMessage];
+						console.log('🔵 [Frontend] New messages count:', updated.length);
+						return updated;
+					});
+				}
 			} catch (error) {
 				console.error('❌ [Frontend] Failed to parse message:', error);
 				setIsLoading(false); // Stop loading on error too
@@ -461,17 +687,9 @@ export const MockChatbot: React.FC = () => {
 	const handleSend = useCallback(() => {
 		if (!input.trim() || !wsRef.current) return;
 
-		if (!selectedCompositionId) {
-			setMessages((prev) => [
-				...prev,
-				{
-					text: '⚠️ Please create or select a composition first!',
-					sender: 'bot',
-					timestamp: new Date(),
-				},
-			]);
-			return;
-		}
+		// Allow chat even without selectedCompositionId - will create new composition
+		// But if we have a selectedCompositionId, use it
+		const compositionIdToUse = selectedCompositionId;
 
 		const userMessage: Message = {
 			text: input,
@@ -482,14 +700,24 @@ export const MockChatbot: React.FC = () => {
 		setMessages((prev) => [...prev, userMessage]);
 		setIsLoading(true); // Start loading indicator
 
+		// Get current composition details for editing (if editing)
+		const currentComposition = compositionIdToUse 
+			? compositions.find(c => c.id === compositionIdToUse)
+			: null;
+		
 		wsRef.current.send(JSON.stringify({
 			type: 'chat',
 			message: input,
-			compositionId: selectedCompositionId,
+			compositionId: compositionIdToUse || undefined, // undefined = new composition
+			// Include metadata for editing (backend will get code from its state store)
+			width: currentComposition?.width,
+			height: currentComposition?.height,
+			fps: currentComposition?.fps,
+			durationInFrames: currentComposition?.durationInFrames,
 		}));
 
 		setInput('');
-	}, [input, selectedCompositionId]);
+	}, [input, selectedCompositionId, compositions]);
 
 
 	const handleKeyPress = useCallback(
@@ -592,23 +820,15 @@ export const MockChatbot: React.FC = () => {
 					backgroundColor: connected ? '#4ade80' : '#ef4444',
 				}} />
 				Kureita AI
+				{canvasContent && canvasContent.type === 'composition' && (
+					<>
+						<span style={{ opacity: 0.5, margin: '0 8px' }}>•</span>
+						<span style={{ opacity: 0.7, fontWeight: 400 }}>
+							{canvasContent.compositionId}
+						</span>
+					</>
+				)}
 			</div>
-			{selectedCompositionId && (
-				<div style={{
-					marginBottom: '12px',
-					padding: '8px 12px',
-					backgroundColor: INPUT_BACKGROUND,
-					border: '1px solid rgba(255, 255, 255, 0.08)',
-					borderRadius: '6px',
-					fontSize: '12px',
-					color: TEXT_COLOR,
-				}}>
-					<span style={{ opacity: 0.7 }}>Editing: </span>
-					<span style={{ fontWeight: 500 }}>
-						{compositions.find(c => c.id === selectedCompositionId)?.name || selectedCompositionId}
-					</span>
-				</div>
-			)}
 			<div style={messagesContainer}>
 				{messages.map((message, index) => (
 					<div
@@ -668,7 +888,11 @@ export const MockChatbot: React.FC = () => {
 					value={input}
 					onChange={(e) => setInput(e.target.value)}
 					onKeyPress={handleKeyPress}
-					placeholder={selectedCompositionId ? "Type your message..." : "Select an AI composition from the sidebar..."}
+					placeholder={
+						selectedCompositionId 
+							? `Type your message to edit "${compositions.find(c => c.id === selectedCompositionId)?.name || 'composition'}..."` 
+							: "Type your message to create a new video..."
+					}
 					style={inputStyle}
 					disabled={!connected}
 				/>

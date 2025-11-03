@@ -53,15 +53,33 @@ async function handleCodeEditWithErrorChecking(
   ws: WebSocket,
   retryAttempt: number = 0
 ): Promise<void> {
-  const composition = compositionManager.getComposition(compositionId);
+  let composition = compositionManager.getComposition(compositionId);
+  
+  // If composition doesn't exist, create it with the provided metadata
   if (!composition) {
-    ws.send(JSON.stringify({
-      type: 'code-updated',
-      success: false,
-      error: 'Composition not found',
-      content: `❌ Composition not found`
-    }));
-    return;
+    console.log(`📝 Composition "${compositionId}" not found, creating it...`);
+    try {
+      // Use compositionId as the name (it should already be sanitized)
+      composition = compositionManager.createComposition(compositionId, {
+        width: width ?? 1920,
+        height: height ?? 1080,
+        fps: fps ?? 30,
+        durationInFrames: durationInFrames ?? 150,
+      });
+      console.log(`✅ Created composition: ${composition.id} (${composition.name})`);
+      
+      // Regenerate composition loader to include the new composition
+      generateCompositionLoader(compositionManager, path.resolve(__dirname, '../../example/src'));
+    } catch (error) {
+      console.error(`❌ Failed to create composition: ${error}`);
+      ws.send(JSON.stringify({
+        type: 'code-updated',
+        success: false,
+        error: 'Failed to create composition',
+        content: `❌ Failed to create composition: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }));
+      return;
+    }
   }
 
   // Update the code file
@@ -547,21 +565,25 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
           const state = connectionState.get(ws);
           const compositionId = message.compositionId || state?.selectedCompositionId;
           
-          if (compositionId) {
-            // Save user message to chat history
-            compositionManager.addChatMessage(compositionId, 'user', message.message);
+          // Require a composition to be selected
+          if (!compositionId) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              content: 'Please select a composition first before sending a message.',
+            }));
+            return;
           }
+          
+          // Save user message to chat history
+          compositionManager.addChatMessage(compositionId, 'user', message.message);
 
           if (aiBackendConnection && aiBackendConnection.readyState === WebSocket.OPEN) {
             // If editing an existing composition, read the current code to pass to LLM
-            let existingCode: string | undefined;
-            if (compositionId) {
-              const code = compositionManager.getCompositionCode(compositionId);
-              existingCode = code || undefined;
-            }
+            const code = compositionManager.getCompositionCode(compositionId);
+            const existingCode = code || undefined;
             
             // Get assets for this composition
-            const assets = compositionId ? assetManager.getAssetsByComposition(compositionId) : [];
+            const assets = assetManager.getAssetsByComposition(compositionId);
             
             // Include composition ID, existing code, and available assets in message to backend
             aiBackendConnection.send(JSON.stringify({
@@ -620,10 +642,22 @@ export const makeAIWebSocketServer = (server: HTTPServer) => {
         if (message.type === 'code-generation' || message.type === 'code-edit') {
           console.log('🎨 Processing code update request...');
           
-          if (message.type === 'code-edit' && compositionId) {
+          if (message.type === 'code-edit') {
+            // Backend should always include compositionId in code-edit message
+            if (!message.compositionId) {
+              console.error('❌ code-edit message missing compositionId');
+              ws.send(JSON.stringify({
+                type: 'code-updated',
+                success: false,
+                error: 'Backend error: compositionId missing',
+                content: '❌ Internal error: composition ID missing'
+              }));
+              return;
+            }
+            
             // Edit existing composition with error checking
             await handleCodeEditWithErrorChecking(
-              compositionId,
+              message.compositionId,
               message.code,
               message.width,
               message.height,

@@ -7,12 +7,98 @@
 import React from 'react';
 import { Composition } from 'remotion';
 
-
+// @ts-expect-error - Dynamic import
+const Compnew_projectModule = require('./ai-projects/composition-new-project');
+const Compnew_project = Compnew_projectModule.AIGeneratedComponent || Compnew_projectModule.default;
+// @ts-expect-error - Dynamic import
+const Compnew_project_2Module = require('./ai-projects/composition-new-project-2');
+const Compnew_project_2 = Compnew_project_2Module.AIGeneratedComponent || Compnew_project_2Module.default;
+// @ts-expect-error - Dynamic import
+const Comptest_agentModule = require('./ai-projects/composition-test-agent');
+const Comptest_agent = Comptest_agentModule.AIGeneratedComponent || Comptest_agentModule.default;
+// @ts-expect-error - Dynamic import
+const Compkureita_demoModule = require('./ai-projects/composition-kureita-demo');
+const Compkureita_demo = Compkureita_demoModule.AIGeneratedComponent || Compkureita_demoModule.default;
+// @ts-expect-error - Dynamic import
+const Compdemo_2Module = require('./ai-projects/composition-demo-2');
+const Compdemo_2 = Compdemo_2Module.AIGeneratedComponent || Compdemo_2Module.default;
+// @ts-expect-error - Dynamic import
+const Compdemo_3Module = require('./ai-projects/composition-demo-3');
+const Compdemo_3 = Compdemo_3Module.AIGeneratedComponent || Compdemo_3Module.default;
+// @ts-expect-error - Dynamic import
+const Compdemo_4Module = require('./ai-projects/composition-demo-4');
+const Compdemo_4 = Compdemo_4Module.AIGeneratedComponent || Compdemo_4Module.default;
+// @ts-expect-error - Dynamic import
+const Compdemo_5Module = require('./ai-projects/composition-demo-5');
+const Compdemo_5 = Compdemo_5Module.AIGeneratedComponent || Compdemo_5Module.default;
 
 export const AIGeneratedCompositions: React.FC = () => {
 	return (
 		<>
-
+			<Composition
+				id="new-project"
+				component={Compnew_project}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={150}
+			/>
+			<Composition
+				id="new-project-2"
+				component={Compnew_project_2}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={750}
+			/>
+			<Composition
+				id="test-agent"
+				component={Comptest_agent}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={150}
+			/>
+			<Composition
+				id="kureita-demo"
+				component={Compkureita_demo}
+				width={1080}
+				height={1920}
+				fps={30}
+				durationInFrames={450}
+			/>
+			<Composition
+				id="demo-2"
+				component={Compdemo_2}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={150}
+			/>
+			<Composition
+				id="demo-3"
+				component={Compdemo_3}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={150}
+			/>
+			<Composition
+				id="demo-4"
+				component={Compdemo_4}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={600}
+			/>
+			<Composition
+				id="demo-5"
+				component={Compdemo_5}
+				width={1920}
+				height={1080}
+				fps={30}
+				durationInFrames={600}
+			/>
 		</>
 	);
 };
